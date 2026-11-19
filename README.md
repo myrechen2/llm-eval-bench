@@ -18,59 +18,48 @@
 
 所有题目都是新写的(数据、题面均为原创或随机生成),降低训练数据污染的影响。
 
-## 运行流程
+## 运行流程(匿名测评)
 
-### 1. 给每个被测配置起一个 SUBMISSION_ID
+评审只看到随机的匿名 ID(形如 `anon-3f9c1a`),看不到模型和思考强度。**"ID ↔ 模型配置"的对应表只保存在你自己手里,不要放进任何仓库**,等评审出分后再公布。
 
-格式建议:`<模型>__<思考强度>__<工具>`,全小写,只用 `a-z 0-9 . _ -`。例如:
-
-```
-gemini-3.1-pro__high__gemini-cli
-gemini-3.1-pro__low__gemini-cli
-gemini-3-flash__medium__gemini-cli
-```
-
-### 2. 每个配置用一个**全新的 clone**(重要)
-
-避免后跑的模型看到先跑的模型的分支或残留文件:
+### 1. 每次运行用一个全新的 clone,目录名保持中性
 
 ```bash
-git clone https://github.com/myrechen2/llm-eval-bench.git run-<SUBMISSION_ID>
-cd run-<SUBMISSION_ID>
+git clone https://github.com/myrechen2/llm-eval-bench.git bench-run-01
 ```
 
-### 3. 在 agent 工具里设置好模型和思考强度,然后发送提示词
+目录名不要带模型名(模型可能会把路径写进报告)。全新 clone 也能保证后跑的模型看不到先跑的结果。
+
+### 2. 在 agent 工具里选好模型和思考强度,发送下面的通用提示词(所有模型完全相同)
 
 ```text
-你正在参加一个模型能力测评。请先完整阅读仓库根目录的 AGENTS.md,并严格遵守其中的规则。
-你的 SUBMISSION_ID 是:<在这里填写>
-请依次完成 tasks/ 下的全部 5 个任务,按 AGENTS.md 的要求提交到分支 submit/<SUBMISSION_ID> 并推送。
-过程中不要向我提问;遇到不确定的地方自行做出合理判断,并在对应的 NOTES / REPORT 中写明。
+请完整阅读当前仓库根目录的 AGENTS.md,并严格按照其中的规则,独立完成全部任务并提交。
+过程中不要向我提问;遇到不确定的地方,自行做出合理判断,并在相应的 NOTES.md / REPORT.md 中写明。
 ```
 
-如果上下文不够用或想分开统计,也可以每个任务开一个新会话,把第三行改成“请只完成任务 0X”。
+模型会运行 `scripts/new_submission_id.py` 领取匿名 ID,在 `submit/<ID>` 分支上完成并推送,最后在回复里报出 ID。
 
-### 4. 跑完后记录用量
+### 3. 私下记录对应关系和用量
 
-把工具里能看到的 token 用量、费用、耗时补到 `submissions/<SUBMISSION_ID>/meta.json` 的 `usage` 中(或者直接告诉评审)。比较思考强度时,**分数 / 成本 / 耗时**要一起看。
+在你自己的表格里记一行:匿名 ID、模型、思考强度、所用工具、token 用量、费用、耗时、是否干预过。评审出分后再把这张表给评审,用来做"分数 / 成本 / 耗时"的综合对比。
 
-### 5. 全部跑完后通知评审
+### 4. 全部跑完后通知评审
 
-不要把 `submit/*` 分支合并到 main。告诉评审有哪些分支即可。
+不要把 `submit/*` 分支合并到 main,告诉评审"都跑完了"即可。
 
 ## 公平性建议
 
-* 同一批对比尽量用**同一个 agent 工具**(例如都用 Gemini CLI),只改模型和思考强度;工具不同会显著影响结果。
-* 思考强度:Gemini 3 系列 API 的参数是 `thinking_level`(不同型号支持的档位不同,如 `low` / `medium` / `high`);旧的 2.5 系列用 `thinking_budget`。请在 `meta.json` 的 `thinking_level` 里如实记录你实际设置的值。
-* 跑的过程中尽量不要干预;如果干预了,把次数记到 `meta.json` 的 `human_interventions`。
-* 预算允许的话,同一配置跑 2–3 次取平均,单次结果的方差可能不小。
+* 同一批对比尽量用**同一个 agent 工具**,只改模型和思考强度。
+* 如果上下文不够,可以分多次会话:在**同一个 clone 目录**里开新会话,提示词改成"……只完成任务 0X",模型会沿用同一个匿名 ID。
+* 预算允许的话,同一配置跑 2–3 次(每次新 clone、新 ID),减小偶然性。
 
 ## 仓库结构
 
 ```
 AGENTS.md / GEMINI.md / CLAUDE.md   被测模型的规则(后两者指向 AGENTS.md)
 tasks/0X-*/                         任务说明与数据(只读)
-submissions/_template/meta.json     元数据模板
+submissions/_template/meta.json     自评模板
 submissions/<SUBMISSION_ID>/        各模型的提交(只存在于各自的 submit/* 分支)
-scripts/check_submission.py         提交格式自检(不包含答案)
+scripts/new_submission_id.py        生成匿名 ID、创建提交分支
+scripts/check_submission.py         提交格式与匿名性自检(不包含答案)
 ```

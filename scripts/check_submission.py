@@ -34,6 +34,52 @@ def is_grid(g) -> bool:
             and all(isinstance(v, int) and 0 <= v <= 9 for v in r) for r in g))
 
 
+IDENTITY_RX = re.compile(
+    r"gemini|claude|anthropic|openai|chatgpt|\bgpt[-\s]?\d|\bgpt\b|codex|copilot|deepmind|\bgoogle\b|\bbard\b"
+    r"|qwen|deepseek|llama|\bgrok\b|mistral|\bkimi\b|moonshot|\bglm\b|zhipu|doubao|ernie|\bopus\b|\bsonnet\b"
+    r"|\bhaiku\b|antigravity|\bjules\b|thinking[_ -]?(level|budget)|reasoning[_ -]?effort|co-authored-by"
+    r"|generated with|思考强度|思考预算|推理强度",
+    re.IGNORECASE,
+)
+
+
+def anonymity_checks(sub: Path, sid: str) -> None:
+    hits = []
+    for f in sorted(sub.rglob("*")):
+        if not f.is_file() or f.stat().st_size > 5_000_000:
+            continue
+        try:
+            text = f.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            continue
+        for n, line in enumerate(text.splitlines(), 1):
+            m = IDENTITY_RX.search(line)
+            if m:
+                hits.append(f"{f.relative_to(ROOT)}:{n}: ...{line[max(0, m.start() - 30):m.end() + 30].strip()}...")
+    report(not hits, "no model/vendor/tool/thinking-level mentions in submission files"
+           + ("" if not hits else "\n" + "\n".join("           " + h for h in hits[:20])))
+
+    def git(*a):
+        r = subprocess.run(["git", *a], cwd=ROOT, capture_output=True, text=True)
+        return r.stdout if r.returncode == 0 else None
+
+    branch = (git("rev-parse", "--abbrev-ref", "HEAD") or "").strip()
+    report(branch == f"submit/{sid}", f"on branch submit/{sid} (current: {branch or '?'})")
+    base = "origin/main" if git("rev-parse", "--verify", "-q", "origin/main") else "main"
+    log = git("log", "--format=%an <%ae>%n%B%n----", f"{base}..HEAD")
+    if log is None:
+        report(False, "could not read git log")
+        return
+    bad = [l for l in log.splitlines() if IDENTITY_RX.search(l)]
+    authors = {l for l in log.splitlines() if l.endswith(">") and "<" in l}
+    ok_authors = authors <= {"anon <anon@bench.invalid>"}
+    fix = (f"\n           fix (squashes your commits into one, anonymous):\n"
+           f"             git reset --soft $(git merge-base HEAD {base}) && "
+           f"git -c user.name=anon -c user.email=anon@bench.invalid commit -m \"{sid}: submission\"")
+    report(not bad, "commit messages contain no identifying text" + ("" if not bad else "\n           " + "\n           ".join(bad[:10]) + fix))
+    report(ok_authors, "all commits authored as anon <anon@bench.invalid>" + ("" if ok_authors else f" (found: {sorted(authors)})" + fix))
+
+
 def main(sid: str) -> int:
     if not re.fullmatch(r"[a-z0-9][a-z0-9._-]*", sid):
         print("SUBMISSION_ID should match [a-z0-9][a-z0-9._-]* (lower case)")
@@ -114,6 +160,9 @@ def main(sid: str) -> int:
                      "data-station-id"):
             report(hook in src, f"05 mentions #{hook}")
     report((sub / "05-frontend-metro" / "NOTES.md").is_file(), "05 NOTES.md exists")
+
+    print("anonymity")
+    anonymity_checks(sub, sid)
 
     print("\nRESULT:", "all format checks passed" if ok else "some checks FAILED")
     return 0 if ok else 1
