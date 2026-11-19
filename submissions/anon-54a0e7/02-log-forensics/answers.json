@@ -1,0 +1,20 @@
+{
+  "culprit_deploy_id": "DEP-7731",
+  "mitigation_deploy_id": "DEP-7740",
+  "first_extra_charge_utc": "2026-03-14T06:40:44Z",
+  "orders_needing_refund": 141,
+  "outstanding_refund_minor": {
+    "CNY": 6264430,
+    "USD": 247978
+  },
+  "top_user": {
+    "user_id": "U100670",
+    "outstanding_cny_minor": 915900
+  },
+  "gateway_checkout_502_in_window": 88,
+  "charge_result_stats": {
+    "before_p95_ms": 2456,
+    "during_p95_ms": 3000,
+    "during_timeout_rate_pct": 31.9
+  }
+}
