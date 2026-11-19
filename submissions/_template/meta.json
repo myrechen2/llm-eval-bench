@@ -1,0 +1,26 @@
+{
+  "submission_id": null,
+  "model": null,
+  "thinking_level": null,
+  "harness": null,
+  "harness_version": null,
+  "started_at": null,
+  "finished_at": null,
+  "tasks_attempted": ["01", "02", "03", "04", "05"],
+  "usage": {
+    "input_tokens": null,
+    "output_tokens": null,
+    "thinking_tokens": null,
+    "cost_usd": null,
+    "wall_clock_minutes": null
+  },
+  "human_interventions": 0,
+  "self_assessment": {
+    "01": null,
+    "02": null,
+    "03": null,
+    "04": null,
+    "05": null
+  },
+  "notes": null
+}

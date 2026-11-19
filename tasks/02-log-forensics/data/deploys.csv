@@ -1,0 +1,12 @@
+deploy_id,service,version,started_at_utc,finished_at_utc,author,summary
+DEP-7718,catalog-svc,v5.2.0,2026-03-14T01:05:00Z,2026-03-14T01:09:30Z,mchen,search ranking tweak
+DEP-7722,order-svc,v3.8.1,2026-03-14T02:40:00Z,2026-03-14T02:44:10Z,pzhao,add order.audit log fields
+DEP-7727,web-frontend,2026.03.14-1,2026-03-14T05:50:00Z,2026-03-14T05:52:00Z,lyang,checkout button copy change
+DEP-7729,gateway,cfg-0314a,2026-03-14T06:31:00Z,2026-03-14T06:33:20Z,sre-kwu,"nginx: keepalive_timeout 65s -> 30s, upstream_connect_timeout unchanged"
+DEP-7731,payment-svc,v2.14.0,2026-03-14T06:36:10Z,2026-03-14T06:40:00Z,wliu,PAY-2231: retry charge on provider timeout instead of status polling (max 3 attempts); remove legacy status_check path
+DEP-7735,order-svc,v3.9.0,2026-03-14T07:08:00Z,2026-03-14T07:12:40Z,pzhao,order cache warmup on start; new coupon validation
+DEP-7740,payment-svc,v2.13.4,2026-03-14T07:58:40Z,2026-03-14T08:02:30Z,oncall-hzhang,rollback to v2.13.4 (incident INC-0314)
+DEP-7744,catalog-svc,v5.2.1,2026-03-14T10:20:00Z,2026-03-14T10:23:00Z,mchen,fix thumbnail urls
+DEP-7749,gateway,cfg-0314b,2026-03-14T13:00:00Z,2026-03-14T13:01:30Z,sre-kwu,nginx: add rate limit for /api/v2/search
+DEP-7752,payment-svc,v2.14.2,2026-03-14T15:30:00Z,2026-03-14T15:34:00Z,wliu,PAY-2240: retry on timeout re-uses the payment intent idempotency key; re-enable retries
+DEP-7755,web-frontend,2026.03.14-2,2026-03-14T19:10:00Z,2026-03-14T19:12:00Z,lyang,revert checkout button copy
