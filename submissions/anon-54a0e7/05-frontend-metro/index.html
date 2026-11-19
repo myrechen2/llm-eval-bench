@@ -1,0 +1,2160 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>城市轨道交通线路图与路径规划器</title>
+  <style>
+    :root {
+      --bg-app: #f4f7fb;
+      --bg-panel: #ffffff;
+      --bg-subtle: #edf2f9;
+      --bg-input: #f8fafd;
+      --bg-map: #f9fbff;
+      --grid-line: rgba(15, 35, 70, 0.045);
+      --text-primary: #0f172a;
+      --text-secondary: #475569;
+      --text-muted: #64748b;
+      --border-color: #dbe3ef;
+      --border-focus: #2563eb;
+      --accent: #2563eb;
+      --accent-soft: rgba(37, 99, 235, 0.12);
+      --origin-color: #16a34a;
+      --dest-color: #e11d48;
+      --transfer-color: #f59e0b;
+      --shadow-sm: 0 2px 8px rgba(15, 23, 42, 0.05);
+      --shadow-md: 0 8px 24px rgba(15, 23, 42, 0.08);
+      --station-fill: #ffffff;
+      --station-stroke: #334155;
+      --label-halo: rgba(255, 255, 255, 0.92);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg-app: #0b1120;
+        --bg-panel: #111827;
+        --bg-subtle: #1e293b;
+        --bg-input: #0f172a;
+        --bg-map: #0d1526;
+        --grid-line: rgba(148, 163, 184, 0.06);
+        --text-primary: #f1f5f9;
+        --text-secondary: #cbd5e1;
+        --text-muted: #94a3b8;
+        --border-color: #263449;
+        --border-focus: #3b82f6;
+        --accent: #3b82f6;
+        --accent-soft: rgba(59, 130, 246, 0.18);
+        --origin-color: #22c55e;
+        --dest-color: #f43f5e;
+        --transfer-color: #fbbf24;
+        --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.35);
+        --shadow-md: 0 10px 30px rgba(0, 0, 0, 0.5);
+        --station-fill: #0f172a;
+        --station-stroke: #e2e8f0;
+        --label-halo: rgba(13, 21, 38, 0.92);
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: 100%;
+      max-width: 100%;
+      overflow-x: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      background: var(--bg-app);
+      color: var(--text-primary);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .app-shell {
+      display: grid;
+      grid-template-columns: 380px minmax(0, 1fr);
+      min-height: 100vh;
+      width: 100%;
+      max-width: 100vw;
+    }
+
+    /* Sidebar Panel */
+    .sidebar {
+      background: var(--bg-panel);
+      border-right: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      padding: 20px;
+      gap: 16px;
+      z-index: 20;
+      box-shadow: var(--shadow-sm);
+      max-height: 100vh;
+      overflow-y: auto;
+    }
+
+    .brand-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .brand-title-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .brand-logo {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #2563eb, #1d4ed8);
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 18px;
+      flex-shrink: 0;
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+    }
+
+    .brand-title {
+      font-size: 17px;
+      font-weight: 700;
+      line-height: 1.25;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .brand-subtitle {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    /* Search Controls */
+    .planner-card {
+      background: var(--bg-subtle);
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .inputs-row {
+      display: flex;
+      align-items: stretch;
+      gap: 8px;
+    }
+
+    .inputs-stack {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .field-wrap {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .field-badge {
+      position: absolute;
+      left: 10px;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      font-size: 11px;
+      font-weight: 700;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .field-badge.origin {
+      background: var(--origin-color);
+    }
+
+    .field-badge.dest {
+      background: var(--dest-color);
+    }
+
+    .station-input {
+      width: 100%;
+      height: 40px;
+      padding: 0 32px 0 38px;
+      border-radius: 10px;
+      border: 1px solid var(--border-color);
+      background: var(--bg-input);
+      color: var(--text-primary);
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+
+    .station-input:focus {
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 3px var(--accent-soft);
+    }
+
+    .clear-field-btn {
+      position: absolute;
+      right: 8px;
+      width: 22px;
+      height: 22px;
+      border: none;
+      border-radius: 50%;
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 15px;
+      line-height: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .clear-field-btn:hover {
+      background: var(--border-color);
+      color: var(--text-primary);
+    }
+
+    .suggestions-dropdown {
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      right: 0;
+      background: var(--bg-panel);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      box-shadow: var(--shadow-md);
+      max-height: 220px;
+      overflow-y: auto;
+      z-index: 50;
+      display: none;
+    }
+
+    .suggestions-dropdown.open {
+      display: block;
+    }
+
+    .suggestion-item {
+      padding: 8px 12px;
+      font-size: 13.5px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .suggestion-item:last-child {
+      border-bottom: none;
+    }
+
+    .suggestion-item:hover,
+    .suggestion-item.active {
+      background: var(--accent-soft);
+    }
+
+    .suggestion-name {
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .suggestion-lines {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .mini-line-pill {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 1px 5px;
+      border-radius: 4px;
+      color: #ffffff;
+      white-space: nowrap;
+    }
+
+    #swap-btn {
+      width: 40px;
+      border-radius: 10px;
+      border: 1px solid var(--border-color);
+      background: var(--bg-panel);
+      color: var(--text-secondary);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 17px;
+      transition: all 0.15s ease;
+      flex-shrink: 0;
+    }
+
+    #swap-btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: var(--accent-soft);
+    }
+
+    .mode-bar {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      background: var(--bg-panel);
+      padding: 4px;
+      border-radius: 10px;
+      border: 1px solid var(--border-color);
+    }
+
+    .mode-btn {
+      height: 34px;
+      border: none;
+      border-radius: 7px;
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .mode-btn[aria-pressed="true"],
+    .mode-btn.active {
+      background: var(--accent);
+      color: #ffffff;
+      box-shadow: 0 2px 6px rgba(37, 99, 235, 0.28);
+    }
+
+    /* Route Summary */
+    #route-summary {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      min-height: 160px;
+    }
+
+    .empty-state {
+      border: 1px dashed var(--border-color);
+      border-radius: 12px;
+      padding: 22px 16px;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 13.5px;
+      line-height: 1.6;
+      background: var(--bg-subtle);
+    }
+
+    .empty-state strong {
+      color: var(--text-primary);
+      display: block;
+      margin-bottom: 4px;
+      font-size: 14px;
+    }
+
+    .unreachable-card {
+      border: 1px solid rgba(225, 29, 72, 0.35);
+      background: rgba(225, 29, 72, 0.08);
+      border-radius: 12px;
+      padding: 18px 16px;
+      color: var(--dest-color);
+      font-size: 13.5px;
+      line-height: 1.5;
+    }
+
+    .unreachable-card strong {
+      display: block;
+      font-size: 15px;
+      margin-bottom: 4px;
+    }
+
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .kpi-box {
+      background: var(--bg-subtle);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 10px 8px;
+      text-align: center;
+    }
+
+    .kpi-val {
+      font-size: 19px;
+      font-weight: 800;
+      color: var(--text-primary);
+      line-height: 1.15;
+    }
+
+    .kpi-val span {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-left: 2px;
+    }
+
+    .kpi-label {
+      font-size: 11.5px;
+      color: var(--text-muted);
+      margin-top: 3px;
+    }
+
+    .legs-container {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .leg-card {
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 12px;
+      background: var(--bg-panel);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .leg-bar {
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 5px;
+    }
+
+    .leg-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 8px;
+      padding-left: 6px;
+    }
+
+    .line-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 9px;
+      border-radius: 6px;
+      color: #ffffff;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .leg-meta {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .leg-endpoints {
+      padding-left: 6px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-primary);
+      flex-wrap: wrap;
+    }
+
+    .leg-arrow {
+      color: var(--text-muted);
+      font-weight: 400;
+    }
+
+    .leg-stops-list {
+      margin-top: 8px;
+      padding-left: 6px;
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    .transfer-notice {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 9px;
+      background: rgba(245, 158, 11, 0.12);
+      border: 1px solid rgba(245, 158, 11, 0.32);
+      color: var(--text-primary);
+      font-size: 12.5px;
+      font-weight: 600;
+    }
+
+    .transfer-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--transfer-color);
+      flex-shrink: 0;
+    }
+
+    /* Map Section */
+    .map-workspace {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      background:
+        linear-gradient(to right, var(--grid-line) 1px, transparent 1px) 0 0 / 32px 32px,
+        linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px) 0 0 / 32px 32px,
+        var(--bg-map);
+      min-height: 540px;
+      overflow: hidden;
+    }
+
+    .map-topbar {
+      position: absolute;
+      top: 14px;
+      left: 14px;
+      right: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      pointer-events: none;
+      z-index: 10;
+      flex-wrap: wrap;
+    }
+
+    .legend-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      background: var(--bg-panel);
+      border: 1px solid var(--border-color);
+      border-radius: 11px;
+      padding: 7px 11px;
+      box-shadow: var(--shadow-sm);
+      pointer-events: auto;
+      max-width: 100%;
+    }
+
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      padding: 2px 6px;
+      border-radius: 6px;
+    }
+
+    .legend-swatch {
+      width: 14px;
+      height: 4px;
+      border-radius: 2px;
+    }
+
+    .map-tools {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 4px;
+      box-shadow: var(--shadow-sm);
+      pointer-events: auto;
+    }
+
+    .tool-btn {
+      width: 30px;
+      height: 30px;
+      border: none;
+      border-radius: 7px;
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .tool-btn:hover {
+      background: var(--bg-subtle);
+      color: var(--text-primary);
+    }
+
+    .svg-container {
+      width: 100%;
+      height: 100%;
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      touch-action: manipulation;
+    }
+
+    #metro-svg {
+      width: 100%;
+      height: 100%;
+      min-height: 520px;
+      display: block;
+      user-select: none;
+    }
+
+    /* SVG Elements */
+    .metro-edge {
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      transition: opacity 0.2s ease, stroke-width 0.2s ease;
+    }
+
+    .metro-edge.dimmed {
+      opacity: 0.16;
+    }
+
+    .metro-edge.highlighted {
+      opacity: 1;
+      filter: drop-shadow(0 0 5px rgba(37, 99, 235, 0.35));
+    }
+
+    .station-node {
+      cursor: pointer;
+      transition: opacity 0.2s ease, transform 0.15s ease;
+    }
+
+    .station-node.dimmed {
+      opacity: 0.32;
+    }
+
+    .station-label {
+      font-size: 12px;
+      font-weight: 600;
+      fill: var(--text-primary);
+      paint-order: stroke;
+      stroke: var(--label-halo);
+      stroke-width: 4px;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+
+    .station-label.dimmed {
+      opacity: 0.35;
+    }
+
+    .station-label.active-label {
+      font-weight: 800;
+      font-size: 13px;
+    }
+
+    .map-hint {
+      position: absolute;
+      bottom: 12px;
+      left: 14px;
+      background: var(--bg-panel);
+      border: 1px solid var(--border-color);
+      border-radius: 9px;
+      padding: 6px 10px;
+      font-size: 11.5px;
+      color: var(--text-muted);
+      box-shadow: var(--shadow-sm);
+      pointer-events: none;
+    }
+
+    /* Responsive Mobile Layout */
+    @media (max-width: 900px) {
+      .app-shell {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto auto;
+      }
+
+      .sidebar {
+        max-height: none;
+        border-right: none;
+        border-bottom: 1px solid var(--border-color);
+        padding: 14px;
+      }
+
+      .map-workspace {
+        min-height: 440px;
+        height: 58vh;
+      }
+
+      #metro-svg {
+        min-height: 420px;
+      }
+
+      .map-topbar {
+        position: static;
+        padding: 10px 12px 0;
+      }
+
+      .map-hint {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <header class="brand-header">
+        <div class="brand-title-wrap">
+          <div class="brand-logo">M</div>
+          <div style="min-width: 0;">
+            <h1 class="brand-title" id="network-title">滨海市轨道交通(示例)</h1>
+            <p class="brand-subtitle" id="network-stats">5 条线路 · 37 座车站</p>
+          </div>
+        </div>
+      </header>
+
+      <section class="planner-card" aria-label="路径规划控制区">
+        <div class="inputs-row">
+          <div class="inputs-stack">
+            <div class="field-wrap">
+              <span class="field-badge origin">起</span>
+              <input
+                id="origin-input"
+                class="station-input"
+                type="text"
+                placeholder="输入或在地图点击起点站"
+                autocomplete="off"
+                aria-label="起点站"
+              />
+              <button type="button" class="clear-field-btn" id="clear-origin-btn" title="清空起点" aria-label="清空起点">×</button>
+              <div class="suggestions-dropdown" id="origin-suggestions" role="listbox"></div>
+            </div>
+
+            <div class="field-wrap">
+              <span class="field-badge dest">终</span>
+              <input
+                id="destination-input"
+                class="station-input"
+                type="text"
+                placeholder="输入或在地图点击终点站"
+                autocomplete="off"
+                aria-label="终点站"
+              />
+              <button type="button" class="clear-field-btn" id="clear-dest-btn" title="清空终点" aria-label="清空终点">×</button>
+              <div class="suggestions-dropdown" id="destination-suggestions" role="listbox"></div>
+            </div>
+          </div>
+
+          <button type="button" id="swap-btn" title="交换起终点" aria-label="交换起终点">⇅</button>
+        </div>
+
+        <div class="mode-bar" role="group" aria-label="出行偏好模式">
+          <button type="button" id="mode-time" class="mode-btn active" aria-pressed="true">
+            <span>⏱</span> 最短时间
+          </button>
+          <button type="button" id="mode-transfers" class="mode-btn" aria-pressed="false">
+            <span>⇄</span> 最少换乘
+          </button>
+        </div>
+      </section>
+
+      <section id="route-summary" aria-live="polite"></section>
+    </aside>
+
+    <main class="map-workspace">
+      <div class="map-topbar">
+        <div class="legend-bar" id="legend-bar"></div>
+        <div class="map-tools">
+          <button type="button" class="tool-btn" id="zoom-in-btn" title="放大地图" aria-label="放大地图">+</button>
+          <button type="button" class="tool-btn" id="zoom-out-btn" title="缩小地图" aria-label="缩小地图">−</button>
+          <button type="button" class="tool-btn" id="zoom-reset-btn" title="重置视图" aria-label="重置视图">⟲</button>
+        </div>
+      </div>
+
+      <div class="svg-container" id="svg-container">
+        <svg id="metro-svg" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="地铁线路图"></svg>
+      </div>
+
+      <div class="map-hint">点击站点设为起点 / 终点 · 滚轮或按钮可缩放平移地图</div>
+    </main>
+  </div>
+
+  <script>
+    (function () {
+      "use strict";
+
+      const DEFAULT_NETWORK = {
+        "name": "滨海市轨道交通(示例)",
+        "transferTime": 4,
+        "stations": [
+          { "id": "S01", "name": "西港", "x": 60, "y": 360 },
+          { "id": "S02", "name": "渔人码头", "x": 140, "y": 355 },
+          { "id": "S03", "name": "老城门", "x": 220, "y": 350 },
+          { "id": "S04", "name": "鼓楼", "x": 300, "y": 345 },
+          { "id": "S05", "name": "文庙", "x": 385, "y": 347 },
+          { "id": "S06", "name": "中央广场", "x": 470, "y": 350, "transferTime": 7 },
+          { "id": "S07", "name": "新华路", "x": 560, "y": 350 },
+          { "id": "S08", "name": "体育中心", "x": 640, "y": 350, "transferTime": 2 },
+          { "id": "S09", "name": "东湖", "x": 720, "y": 352 },
+          { "id": "S10", "name": "科技园", "x": 800, "y": 356 },
+          { "id": "S11", "name": "会展中心", "x": 880, "y": 360 },
+          { "id": "S12", "name": "东港", "x": 955, "y": 365 },
+          { "id": "S13", "name": "北站", "x": 470, "y": 40 },
+          { "id": "S14", "name": "植物园", "x": 470, "y": 110 },
+          { "id": "S15", "name": "大学城", "x": 470, "y": 180 },
+          { "id": "S16", "name": "图书馆", "x": 470, "y": 255 },
+          { "id": "S17", "name": "人民医院", "x": 470, "y": 430 },
+          { "id": "S18", "name": "南门", "x": 470, "y": 515 },
+          { "id": "S19", "name": "南站", "x": 470, "y": 625, "transferTime": 6 },
+          { "id": "S20", "name": "青山", "x": 150, "y": 90 },
+          { "id": "S21", "name": "枫林", "x": 230, "y": 150 },
+          { "id": "S22", "name": "太学", "x": 310, "y": 205 },
+          { "id": "S23", "name": "银杏路", "x": 560, "y": 290 },
+          { "id": "S24", "name": "南湖公园", "x": 720, "y": 435 },
+          { "id": "S25", "name": "软件园", "x": 800, "y": 520 },
+          { "id": "S26", "name": "滨江", "x": 865, "y": 600 },
+          { "id": "S30", "name": "云栖", "x": 600, "y": 192 },
+          { "id": "S31", "name": "望江", "x": 690, "y": 255 },
+          { "id": "S32", "name": "观澜", "x": 640, "y": 500 },
+          { "id": "S33", "name": "西苑", "x": 330, "y": 485 },
+          { "id": "S34", "name": "柳岸", "x": 265, "y": 420 },
+          { "id": "S35", "name": "紫金", "x": 390, "y": 172 },
+          { "id": "S40", "name": "机场", "x": 935, "y": 70 },
+          { "id": "S41", "name": "港湾新城", "x": 890, "y": 170 },
+          { "id": "S42", "name": "金融街", "x": 885, "y": 265 },
+          { "id": "S43", "name": "海洋馆", "x": 880, "y": 450 },
+          { "id": "S44", "name": "江心岛", "x": 690, "y": 610 }
+        ],
+        "lines": [
+          {
+            "id": "L1",
+            "name": "1号线",
+            "color": "#d7263d",
+            "loop": false,
+            "stations": ["S01", "S02", "S03", "S04", "S05", "S06", "S07", "S08", "S09", "S10", "S11", "S12"],
+            "times": [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3]
+          },
+          {
+            "id": "L2",
+            "name": "2号线",
+            "color": "#1b6ec2",
+            "loop": false,
+            "stations": ["S13", "S14", "S15", "S16", "S06", "S17", "S18", "S19"],
+            "times": [2, 2, 3, 3, 3, 3, 3]
+          },
+          {
+            "id": "L3",
+            "name": "3号线",
+            "color": "#2a9d4b",
+            "loop": false,
+            "stations": ["S20", "S21", "S22", "S16", "S23", "S08", "S24", "S25", "S26"],
+            "times": [3, 3, 5, 3, 3, 4, 4, 3]
+          },
+          {
+            "id": "L4",
+            "name": "4号线(环线)",
+            "color": "#f08a24",
+            "loop": true,
+            "stations": ["S15", "S30", "S31", "S09", "S24", "S32", "S18", "S33", "S34", "S04", "S22", "S35"],
+            "times": [4, 3, 3, 3, 3, 5, 4, 3, 3, 4, 3, 3]
+          },
+          {
+            "id": "L5",
+            "name": "5号线(机场线)",
+            "color": "#7b3fa0",
+            "loop": false,
+            "stations": ["S40", "S41", "S42", "S11", "S43", "S25", "S44", "S19"],
+            "times": [2, 2, 2, 2, 2, 3, 4]
+          }
+        ]
+      };
+
+      // State
+      let currentNetwork = null;
+      let graphIndex = null;
+      let selectedOriginId = null;
+      let selectedDestId = null;
+      let currentMode = "time";
+      let currentRouteResult = null;
+
+      // Viewbox zoom/pan state
+      let baseViewBox = { x: 0, y: 0, w: 1000, h: 700 };
+      let activeViewBox = { x: 0, y: 0, w: 1000, h: 700 };
+      let isPanning = false;
+      let panStart = { x: 0, y: 0, vx: 0, vy: 0 };
+
+      // DOM elements
+      const networkTitleEl = document.getElementById("network-title");
+      const networkStatsEl = document.getElementById("network-stats");
+      const originInputEl = document.getElementById("origin-input");
+      const destInputEl = document.getElementById("destination-input");
+      const originSugEl = document.getElementById("origin-suggestions");
+      const destSugEl = document.getElementById("destination-suggestions");
+      const clearOriginBtn = document.getElementById("clear-origin-btn");
+      const clearDestBtn = document.getElementById("clear-dest-btn");
+      const swapBtn = document.getElementById("swap-btn");
+      const modeTimeBtn = document.getElementById("mode-time");
+      const modeTransfersBtn = document.getElementById("mode-transfers");
+      const routeSummaryEl = document.getElementById("route-summary");
+      const legendBarEl = document.getElementById("legend-bar");
+      const svgEl = document.getElementById("metro-svg");
+      const zoomInBtn = document.getElementById("zoom-in-btn");
+      const zoomOutBtn = document.getElementById("zoom-out-btn");
+      const zoomResetBtn = document.getElementById("zoom-reset-btn");
+
+      // Binary MinHeap for fast Dijkstra
+      class MinHeap {
+        constructor(compareFn) {
+          this.data = [];
+          this.compare = compareFn;
+        }
+        get size() {
+          return this.data.length;
+        }
+        push(item) {
+          this.data.push(item);
+          this._up(this.data.length - 1);
+        }
+        pop() {
+          if (this.data.length === 0) return null;
+          const top = this.data[0];
+          const bottom = this.data.pop();
+          if (this.data.length > 0) {
+            this.data[0] = bottom;
+            this._down(0);
+          }
+          return top;
+        }
+        _up(i) {
+          const d = this.data;
+          const cmp = this.compare;
+          while (i > 0) {
+            const p = (i - 1) >> 1;
+            if (cmp(d[i], d[p]) < 0) {
+              const tmp = d[i];
+              d[i] = d[p];
+              d[p] = tmp;
+              i = p;
+            } else {
+              break;
+            }
+          }
+        }
+        _down(i) {
+          const d = this.data;
+          const cmp = this.compare;
+          const n = d.length;
+          while (true) {
+            let left = (i << 1) + 1;
+            let right = left + 1;
+            let smallest = i;
+            if (left < n && cmp(d[left], d[smallest]) < 0) smallest = left;
+            if (right < n && cmp(d[right], d[smallest]) < 0) smallest = right;
+            if (smallest !== i) {
+              const tmp = d[i];
+              d[i] = d[smallest];
+              d[smallest] = tmp;
+              i = smallest;
+            } else {
+              break;
+            }
+          }
+        }
+      }
+
+      function buildGraphIndex(network) {
+        const defaultTransfer = typeof network.transferTime === "number" ? network.transferTime : 0;
+        const stationsById = new Map();
+        const stationsByName = new Map();
+        const stationLines = new Map();
+        const linesById = new Map();
+
+        for (const st of network.stations || []) {
+          const tTime = Object.prototype.hasOwnProperty.call(st, "transferTime") && typeof st.transferTime === "number"
+            ? st.transferTime
+            : defaultTransfer;
+          const stObj = {
+            id: String(st.id),
+            name: String(st.name),
+            x: Number(st.x),
+            y: Number(st.y),
+            transferTime: tTime
+          };
+          stationsById.set(stObj.id, stObj);
+          stationsByName.set(stObj.name.trim(), stObj);
+          stationLines.set(stObj.id, []);
+        }
+
+        // Adjacency on (stationId, lineId) riding states
+        // rideAdj: Map<stationId, Map<lineId, Array<{toStationId, travelTime}>>>
+        const rideAdj = new Map();
+        const pairSegments = new Map();
+
+        for (const line of network.lines || []) {
+          const lineId = String(line.id);
+          const lineObj = {
+            id: lineId,
+            name: String(line.name || line.id),
+            color: String(line.color || "#2563eb"),
+            loop: Boolean(line.loop),
+            stations: (line.stations || []).map(String),
+            times: (line.times || []).map(Number)
+          };
+          linesById.set(lineId, lineObj);
+
+          const sts = lineObj.stations;
+          const times = lineObj.times;
+          const n = sts.length;
+          if (n === 0) continue;
+
+          for (const sid of sts) {
+            if (stationLines.has(sid)) {
+              const arr = stationLines.get(sid);
+              if (!arr.includes(lineId)) arr.push(lineId);
+            }
+          }
+
+          const segCount = lineObj.loop ? n : Math.max(0, n - 1);
+          for (let i = 0; i < segCount; i++) {
+            const u = sts[i];
+            const v = sts[(i + 1) % n];
+            const w = Number(times[i] ?? 0);
+            if (!stationsById.has(u) || !stationsById.has(v)) continue;
+
+            if (!rideAdj.has(u)) rideAdj.set(u, new Map());
+            if (!rideAdj.has(v)) rideAdj.set(v, new Map());
+            if (!rideAdj.get(u).has(lineId)) rideAdj.get(u).set(lineId, []);
+            if (!rideAdj.get(v).has(lineId)) rideAdj.get(v).set(lineId, []);
+
+            rideAdj.get(u).get(lineId).push({ toStationId: v, travelTime: w });
+            rideAdj.get(v).get(lineId).push({ toStationId: u, travelTime: w });
+
+            const pairKey = u < v ? `${u}\0${v}` : `${v}\0${u}`;
+            if (!pairSegments.has(pairKey)) pairSegments.set(pairKey, []);
+            pairSegments.get(pairKey).push({ u, v, lineId, travelTime: w });
+          }
+        }
+
+        return {
+          defaultTransfer,
+          stationsById,
+          stationsByName,
+          stationLines,
+          linesById,
+          rideAdj,
+          pairSegments
+        };
+      }
+
+      function compareCosts(a, b, mode) {
+        if (mode === "transfers") {
+          if (a.transfers !== b.transfers) return a.transfers - b.transfers;
+          if (a.time !== b.time) return a.time - b.time;
+          return a.hops - b.hops;
+        } else {
+          if (a.time !== b.time) return a.time - b.time;
+          if (a.transfers !== b.transfers) return a.transfers - b.transfers;
+          return a.hops - b.hops;
+        }
+      }
+
+      function computeRoute(fromId, toId, mode) {
+        if (!graphIndex) return null;
+        const sFrom = String(fromId);
+        const sTo = String(toId);
+        const searchMode = mode === "transfers" ? "transfers" : "time";
+
+        if (!graphIndex.stationsById.has(sFrom) || !graphIndex.stationsById.has(sTo)) {
+          return null;
+        }
+
+        if (sFrom === sTo) {
+          return {
+            totalTime: 0,
+            transfers: 0,
+            path: [sFrom],
+            legs: []
+          };
+        }
+
+        const startLines = graphIndex.stationLines.get(sFrom) || [];
+        const destLines = graphIndex.stationLines.get(sTo) || [];
+        if (startLines.length === 0 || destLines.length === 0) {
+          return null;
+        }
+
+        const dist = new Map();
+        const prev = new Map();
+        const heap = new MinHeap((a, b) => compareCosts(a, b, searchMode));
+
+        for (const lid of startLines) {
+          const lineMap = graphIndex.rideAdj.get(sFrom);
+          const neighbors = lineMap ? (lineMap.get(lid) || []) : [];
+          for (const edge of neighbors) {
+            const nxtKey = `${edge.toStationId}\0${lid}`;
+            const nxtCost = { time: edge.travelTime, transfers: 0, hops: 1 };
+            const oldCost = dist.get(nxtKey);
+            if (!oldCost || compareCosts(nxtCost, oldCost, searchMode) < 0) {
+              dist.set(nxtKey, nxtCost);
+              prev.set(nxtKey, {
+                prevKey: null,
+                type: "ride",
+                fromStation: sFrom,
+                toStation: edge.toStationId,
+                lineId: lid,
+                stepTime: edge.travelTime
+              });
+              heap.push({
+                stationId: edge.toStationId,
+                lineId: lid,
+                time: nxtCost.time,
+                transfers: nxtCost.transfers,
+                hops: nxtCost.hops
+              });
+            }
+          }
+        }
+
+        let bestGoalKey = null;
+        let bestGoalCost = null;
+
+        while (heap.size > 0) {
+          const cur = heap.pop();
+          const curKey = `${cur.stationId}\0${cur.lineId}`;
+          const known = dist.get(curKey);
+          if (known && compareCosts(cur, known, searchMode) > 0) {
+            continue;
+          }
+
+          if (bestGoalCost && compareCosts(cur, bestGoalCost, searchMode) >= 0) {
+            break;
+          }
+
+          if (cur.stationId === sTo) {
+            bestGoalKey = curKey;
+            bestGoalCost = { time: cur.time, transfers: cur.transfers, hops: cur.hops };
+            break;
+          }
+
+          // 1. Ride along the current line to adjacent stations
+          const lineMap = graphIndex.rideAdj.get(cur.stationId);
+          const neighbors = lineMap ? (lineMap.get(cur.lineId) || []) : [];
+          for (const edge of neighbors) {
+            const nxtKey = `${edge.toStationId}\0${cur.lineId}`;
+            const nxtCost = {
+              time: cur.time + edge.travelTime,
+              transfers: cur.transfers,
+              hops: cur.hops + 1
+            };
+            const oldCost = dist.get(nxtKey);
+            if (!oldCost || compareCosts(nxtCost, oldCost, searchMode) < 0) {
+              dist.set(nxtKey, nxtCost);
+              prev.set(nxtKey, {
+                prevKey: curKey,
+                type: "ride",
+                fromStation: cur.stationId,
+                toStation: edge.toStationId,
+                lineId: cur.lineId,
+                stepTime: edge.travelTime
+              });
+              heap.push({
+                stationId: edge.toStationId,
+                lineId: cur.lineId,
+                time: nxtCost.time,
+                transfers: nxtCost.transfers,
+                hops: nxtCost.hops
+              });
+            }
+          }
+
+          // 2. Transfer to another line at current station and ride one stop on it
+          if (cur.stationId !== sFrom) {
+            const stInfo = graphIndex.stationsById.get(cur.stationId);
+            const tPenalty = stInfo ? stInfo.transferTime : graphIndex.defaultTransfer;
+            const linesHere = graphIndex.stationLines.get(cur.stationId) || [];
+            for (const otherLineId of linesHere) {
+              if (otherLineId === cur.lineId) continue;
+              const otherNeighbors = lineMap ? (lineMap.get(otherLineId) || []) : [];
+              for (const edge of otherNeighbors) {
+                const nxtKey = `${edge.toStationId}\0${otherLineId}`;
+                const nxtCost = {
+                  time: cur.time + tPenalty + edge.travelTime,
+                  transfers: cur.transfers + 1,
+                  hops: cur.hops + 1
+                };
+                const oldCost = dist.get(nxtKey);
+                if (!oldCost || compareCosts(nxtCost, oldCost, searchMode) < 0) {
+                  dist.set(nxtKey, nxtCost);
+                  prev.set(nxtKey, {
+                    prevKey: curKey,
+                    type: "ride",
+                    fromStation: cur.stationId,
+                    toStation: edge.toStationId,
+                    lineId: otherLineId,
+                    stepTime: edge.travelTime,
+                    transferredFrom: cur.lineId,
+                    transferTime: tPenalty
+                  });
+                  heap.push({
+                    stationId: edge.toStationId,
+                    lineId: otherLineId,
+                    time: nxtCost.time,
+                    transfers: nxtCost.transfers,
+                    hops: nxtCost.hops
+                  });
+                }
+              }
+            }
+          }
+        }
+
+        if (!bestGoalKey || !bestGoalCost) {
+          return null;
+        }
+
+        // Reconstruct ride steps
+        const steps = [];
+        let cursor = bestGoalKey;
+        while (cursor) {
+          const info = prev.get(cursor);
+          if (!info) break;
+          steps.push(info);
+          cursor = info.prevKey;
+        }
+        steps.reverse();
+
+        const path = [sFrom];
+        const legs = [];
+        for (const step of steps) {
+          if (step.type === "ride") {
+            path.push(step.toStation);
+            if (legs.length === 0 || legs[legs.length - 1].line !== step.lineId) {
+              legs.push({
+                line: step.lineId,
+                from: step.fromStation,
+                to: step.toStation
+              });
+            } else {
+              legs[legs.length - 1].to = step.toStation;
+            }
+          }
+        }
+
+        return {
+          totalTime: Math.round(bestGoalCost.time),
+          transfers: bestGoalCost.transfers,
+          path,
+          legs
+        };
+      }
+
+      // Compute detailed breakdown for UI display from a route result
+      function buildDetailedLegs(result) {
+        if (!result || !result.legs || result.legs.length === 0) return [];
+        const details = [];
+        let pathIdx = 0;
+
+        for (let i = 0; i < result.legs.length; i++) {
+          const leg = result.legs[i];
+          const lineObj = graphIndex.linesById.get(leg.line);
+          const legStations = [result.path[pathIdx]];
+          let legTime = 0;
+
+          while (pathIdx < result.path.length - 1 && result.path[pathIdx] !== leg.to) {
+            const u = result.path[pathIdx];
+            const v = result.path[pathIdx + 1];
+            const edges = graphIndex.rideAdj.get(u)?.get(leg.line) || [];
+            // If a 2-station loop has two edges, pick minimum travel time
+            let bestW = 0;
+            let found = false;
+            for (const e of edges) {
+              if (e.toStationId === v && (!found || e.travelTime < bestW)) {
+                bestW = e.travelTime;
+                found = true;
+              }
+            }
+            legTime += bestW;
+            pathIdx++;
+            legStations.push(result.path[pathIdx]);
+          }
+
+          let transferAfter = null;
+          if (i < result.legs.length - 1) {
+            const nextLeg = result.legs[i + 1];
+            const transferStation = graphIndex.stationsById.get(leg.to);
+            const nextLine = graphIndex.linesById.get(nextLeg.line);
+            transferAfter = {
+              stationId: leg.to,
+              stationName: transferStation ? transferStation.name : leg.to,
+              toLineId: nextLeg.line,
+              toLineName: nextLine ? nextLine.name : nextLeg.line,
+              toLineColor: nextLine ? nextLine.color : "#2563eb",
+              transferTime: transferStation ? transferStation.transferTime : graphIndex.defaultTransfer
+            };
+          }
+
+          details.push({
+            lineId: leg.line,
+            lineName: lineObj ? lineObj.name : leg.line,
+            lineColor: lineObj ? lineObj.color : "#2563eb",
+            fromId: leg.from,
+            fromName: graphIndex.stationsById.get(leg.from)?.name || leg.from,
+            toId: leg.to,
+            toName: graphIndex.stationsById.get(leg.to)?.name || leg.to,
+            stopCount: legStations.length - 1,
+            legTime,
+            stations: legStations.map(sid => graphIndex.stationsById.get(sid)?.name || sid),
+            transferAfter
+          });
+        }
+        return details;
+      }
+
+      // Compute non-overlapping label offsets for each station
+      function computeLabelPlacements(stations) {
+        const placements = new Map();
+        const candidateOffsets = [
+          { dx: 0, dy: -13, anchor: "middle" },
+          { dx: 0, dy: 20, anchor: "middle" },
+          { dx: 12, dy: 4, anchor: "start" },
+          { dx: -12, dy: 4, anchor: "end" },
+          { dx: 11, dy: -10, anchor: "start" },
+          { dx: -11, dy: -10, anchor: "end" },
+          { dx: 11, dy: 17, anchor: "start" },
+          { dx: -11, dy: 17, anchor: "end" }
+        ];
+
+        const occupiedBoxes = [];
+        for (const st of stations) {
+          occupiedBoxes.push({
+            x1: st.x - 9,
+            y1: st.y - 9,
+            x2: st.x + 9,
+            y2: st.y + 9
+          });
+        }
+
+        for (const st of stations) {
+          const textWidth = Math.max(28, st.name.length * 12.5);
+          const textHeight = 14;
+          let bestCand = candidateOffsets[0];
+          let bestScore = Infinity;
+
+          for (const cand of candidateOffsets) {
+            let x1 = st.x + cand.dx;
+            if (cand.anchor === "middle") x1 -= textWidth / 2;
+            else if (cand.anchor === "end") x1 -= textWidth;
+            const y1 = st.y + cand.dy - textHeight + 3;
+            const box = { x1, y1, x2: x1 + textWidth, y2: y1 + textHeight };
+
+            let penalty = 0;
+            for (const ob of occupiedBoxes) {
+              const ox = Math.max(0, Math.min(box.x2, ob.x2) - Math.max(box.x1, ob.x1));
+              const oy = Math.max(0, Math.min(box.y2, ob.y2) - Math.max(box.y1, ob.y1));
+              if (ox > 0 && oy > 0) {
+                penalty += ox * oy;
+              }
+            }
+
+            if (penalty < bestScore) {
+              bestScore = penalty;
+              bestCand = cand;
+              if (penalty === 0) break;
+            }
+          }
+
+          let x1 = st.x + bestCand.dx;
+          if (bestCand.anchor === "middle") x1 -= textWidth / 2;
+          else if (bestCand.anchor === "end") x1 -= textWidth;
+          const y1 = st.y + bestCand.dy - textHeight + 3;
+          occupiedBoxes.push({ x1, y1, x2: x1 + textWidth, y2: y1 + textHeight });
+          placements.set(st.id, bestCand);
+        }
+
+        return placements;
+      }
+
+      function applyViewBox() {
+        svgEl.setAttribute(
+          "viewBox",
+          `${activeViewBox.x.toFixed(1)} ${activeViewBox.y.toFixed(1)} ${activeViewBox.w.toFixed(1)} ${activeViewBox.h.toFixed(1)}`
+        );
+      }
+
+      function renderNetworkMap() {
+        svgEl.innerHTML = "";
+        if (!currentNetwork || !graphIndex) return;
+
+        const stations = Array.from(graphIndex.stationsById.values());
+        if (stations.length === 0) return;
+
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+        for (const st of stations) {
+          if (st.x < minX) minX = st.x;
+          if (st.x > maxX) maxX = st.x;
+          if (st.y < minY) minY = st.y;
+          if (st.y > maxY) maxY = st.y;
+        }
+
+        if (!isFinite(minX) || !isFinite(minY)) {
+          minX = 0; maxX = 800; minY = 0; maxY = 600;
+        }
+
+        const padX = Math.max(75, (maxX - minX) * 0.1);
+        const padY = Math.max(65, (maxY - minY) * 0.12);
+        baseViewBox = {
+          x: minX - padX,
+          y: minY - padY,
+          w: Math.max(240, (maxX - minX) + padX * 2),
+          h: Math.max(200, (maxY - minY) + padY * 2)
+        };
+        activeViewBox = { ...baseViewBox };
+        applyViewBox();
+
+        const ns = "http://www.w3.org/2000/svg";
+        const edgesGroup = document.createElementNS(ns, "g");
+        edgesGroup.setAttribute("id", "map-edges");
+        const stationsGroup = document.createElementNS(ns, "g");
+        stationsGroup.setAttribute("id", "map-stations");
+        const labelsGroup = document.createElementNS(ns, "g");
+        labelsGroup.setAttribute("id", "map-labels");
+
+        // Render parallel segments with slight perpendicular offset so both lines are visible
+        for (const [, segList] of graphIndex.pairSegments.entries()) {
+          const total = segList.length;
+          segList.forEach((seg, idx) => {
+            const stU = graphIndex.stationsById.get(seg.u);
+            const stV = graphIndex.stationsById.get(seg.v);
+            const lineObj = graphIndex.linesById.get(seg.lineId);
+            if (!stU || !stV || !lineObj) return;
+
+            // Canonical perpendicular direction so offset is stable
+            const a = stU.id < stV.id ? stU : stV;
+            const b = stU.id < stV.id ? stV : stU;
+            const dx = b.x - a.x;
+            const dy = b.y - a.y;
+            const len = Math.hypot(dx, dy) || 1;
+            const nx = -dy / len;
+            const ny = dx / len;
+            const offset = (idx - (total - 1) / 2) * 5;
+
+            const lineEl = document.createElementNS(ns, "line");
+            lineEl.setAttribute("x1", String(stU.x + nx * offset));
+            lineEl.setAttribute("y1", String(stU.y + ny * offset));
+            lineEl.setAttribute("x2", String(stV.x + nx * offset));
+            lineEl.setAttribute("y2", String(stV.y + ny * offset));
+            lineEl.setAttribute("stroke", lineObj.color);
+            lineEl.setAttribute("stroke-width", "5");
+            lineEl.setAttribute("class", "metro-edge");
+            lineEl.dataset.lineId = seg.lineId;
+            lineEl.dataset.u = seg.u;
+            lineEl.dataset.v = seg.v;
+            edgesGroup.appendChild(lineEl);
+          });
+        }
+
+        const labelPlacements = computeLabelPlacements(stations);
+
+        for (const st of stations) {
+          const linesHere = graphIndex.stationLines.get(st.id) || [];
+          const isTransfer = linesHere.length >= 2;
+          const primaryLine = linesHere.length === 1 ? graphIndex.linesById.get(linesHere[0]) : null;
+
+          const g = document.createElementNS(ns, "g");
+          g.setAttribute("class", "station-node");
+          g.setAttribute("data-station-id", st.id);
+          g.setAttribute("tabindex", "0");
+          g.setAttribute("role", "button");
+          g.setAttribute("aria-label", `${st.name}${isTransfer ? " (换乘站)" : ""}`);
+
+          // Invisible hit target for easier tap on mobile
+          const hit = document.createElementNS(ns, "circle");
+          hit.setAttribute("cx", String(st.x));
+          hit.setAttribute("cy", String(st.y));
+          hit.setAttribute("r", "14");
+          hit.setAttribute("fill", "transparent");
+          g.appendChild(hit);
+
+          if (isTransfer) {
+            const outer = document.createElementNS(ns, "circle");
+            outer.setAttribute("cx", String(st.x));
+            outer.setAttribute("cy", String(st.y));
+            outer.setAttribute("r", "7.5");
+            outer.setAttribute("fill", "var(--station-fill)");
+            outer.setAttribute("stroke", "var(--station-stroke)");
+            outer.setAttribute("stroke-width", "2.6");
+            outer.setAttribute("class", "station-circle");
+            g.appendChild(outer);
+
+            const inner = document.createElementNS(ns, "circle");
+            inner.setAttribute("cx", String(st.x));
+            inner.setAttribute("cy", String(st.y));
+            inner.setAttribute("r", "3.4");
+            inner.setAttribute("fill", "var(--station-stroke)");
+            inner.setAttribute("class", "station-inner");
+            g.appendChild(inner);
+          } else {
+            const circle = document.createElementNS(ns, "circle");
+            circle.setAttribute("cx", String(st.x));
+            circle.setAttribute("cy", String(st.y));
+            circle.setAttribute("r", "5.2");
+            circle.setAttribute("fill", "var(--station-fill)");
+            circle.setAttribute("stroke", primaryLine ? primaryLine.color : "var(--station-stroke)");
+            circle.setAttribute("stroke-width", "2.6");
+            circle.setAttribute("class", "station-circle");
+            g.appendChild(circle);
+          }
+
+          g.addEventListener("click", (e) => {
+            e.stopPropagation();
+            handleStationClick(st.id);
+          });
+
+          g.addEventListener("keydown", (e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              handleStationClick(st.id);
+            }
+          });
+
+          stationsGroup.appendChild(g);
+
+          const placement = labelPlacements.get(st.id) || { dx: 0, dy: -12, anchor: "middle" };
+          const textEl = document.createElementNS(ns, "text");
+          textEl.setAttribute("x", String(st.x + placement.dx));
+          textEl.setAttribute("y", String(st.y + placement.dy));
+          textEl.setAttribute("text-anchor", placement.anchor);
+          textEl.setAttribute("class", "station-label");
+          textEl.dataset.stationId = st.id;
+          textEl.textContent = st.name;
+          labelsGroup.appendChild(textEl);
+        }
+
+        svgEl.appendChild(edgesGroup);
+        svgEl.appendChild(stationsGroup);
+        svgEl.appendChild(labelsGroup);
+
+        const markersGroup = document.createElementNS(ns, "g");
+        markersGroup.setAttribute("id", "map-markers");
+        svgEl.appendChild(markersGroup);
+      }
+
+      function renderLegend() {
+        legendBarEl.innerHTML = "";
+        if (!currentNetwork) return;
+        for (const line of currentNetwork.lines || []) {
+          const item = document.createElement("div");
+          item.className = "legend-item";
+          const swatch = document.createElement("span");
+          swatch.className = "legend-swatch";
+          swatch.style.backgroundColor = line.color || "#2563eb";
+          const label = document.createElement("span");
+          label.textContent = line.name || line.id;
+          item.appendChild(swatch);
+          item.appendChild(label);
+          legendBarEl.appendChild(item);
+        }
+
+        const transferLegend = document.createElement("div");
+        transferLegend.className = "legend-item";
+        transferLegend.innerHTML = `<span style="width:10px;height:10px;border-radius:50%;border:2px solid var(--station-stroke);display:inline-block;"></span><span>换乘站</span>`;
+        legendBarEl.appendChild(transferLegend);
+      }
+
+      function updateMapHighlight() {
+        const edges = svgEl.querySelectorAll(".metro-edge");
+        const nodes = svgEl.querySelectorAll(".station-node");
+        const labels = svgEl.querySelectorAll(".station-label");
+        const markersGroup = svgEl.querySelector("#map-markers");
+        if (markersGroup) markersGroup.innerHTML = "";
+
+        const hasRoute = currentRouteResult && currentRouteResult.path && currentRouteResult.path.length > 0;
+        const activeStations = new Set();
+        const activeDirectedEdges = new Set();
+
+        if (hasRoute) {
+          for (const sid of currentRouteResult.path) {
+            activeStations.add(sid);
+          }
+          let pIdx = 0;
+          for (const leg of currentRouteResult.legs || []) {
+            while (pIdx < currentRouteResult.path.length - 1 && currentRouteResult.path[pIdx] !== leg.to) {
+              const u = currentRouteResult.path[pIdx];
+              const v = currentRouteResult.path[pIdx + 1];
+              activeDirectedEdges.add(`${leg.line}\0${u}\0${v}`);
+              activeDirectedEdges.add(`${leg.line}\0${v}\0${u}`);
+              pIdx++;
+            }
+          }
+        }
+
+        edges.forEach((edgeEl) => {
+          const lid = edgeEl.dataset.lineId;
+          const u = edgeEl.dataset.u;
+          const v = edgeEl.dataset.v;
+          if (!hasRoute) {
+            edgeEl.classList.remove("dimmed", "highlighted");
+            edgeEl.setAttribute("stroke-width", "5");
+          } else if (activeDirectedEdges.has(`${lid}\0${u}\0${v}`)) {
+            edgeEl.classList.remove("dimmed");
+            edgeEl.classList.add("highlighted");
+            edgeEl.setAttribute("stroke-width", "7.5");
+          } else {
+            edgeEl.classList.remove("highlighted");
+            edgeEl.classList.add("dimmed");
+            edgeEl.setAttribute("stroke-width", "4");
+          }
+        });
+
+        nodes.forEach((nodeEl) => {
+          const sid = nodeEl.getAttribute("data-station-id");
+          const isEndpoint = sid === selectedOriginId || sid === selectedDestId;
+          if (!hasRoute) {
+            nodeEl.classList.remove("dimmed");
+          } else if (activeStations.has(sid) || isEndpoint) {
+            nodeEl.classList.remove("dimmed");
+          } else {
+            nodeEl.classList.add("dimmed");
+          }
+        });
+
+        labels.forEach((labelEl) => {
+          const sid = labelEl.dataset.stationId;
+          const isEndpoint = sid === selectedOriginId || sid === selectedDestId;
+          if (!hasRoute) {
+            labelEl.classList.remove("dimmed", "active-label");
+            if (isEndpoint) labelEl.classList.add("active-label");
+          } else if (activeStations.has(sid) || isEndpoint) {
+            labelEl.classList.remove("dimmed");
+            labelEl.classList.add("active-label");
+          } else {
+            labelEl.classList.remove("active-label");
+            labelEl.classList.add("dimmed");
+          }
+        });
+
+        if (markersGroup) {
+          const ns = "http://www.w3.org/2000/svg";
+          const drawPin = (stationId, labelText, color) => {
+            const st = graphIndex.stationsById.get(stationId);
+            if (!st) return;
+            const g = document.createElementNS(ns, "g");
+            g.setAttribute("pointer-events", "none");
+
+            const halo = document.createElementNS(ns, "circle");
+            halo.setAttribute("cx", String(st.x));
+            halo.setAttribute("cy", String(st.y));
+            halo.setAttribute("r", "12");
+            halo.setAttribute("fill", color);
+            halo.setAttribute("fill-opacity", "0.24");
+            g.appendChild(halo);
+
+            const badge = document.createElementNS(ns, "circle");
+            badge.setAttribute("cx", String(st.x));
+            badge.setAttribute("cy", String(st.y));
+            badge.setAttribute("r", "8.5");
+            badge.setAttribute("fill", color);
+            badge.setAttribute("stroke", "#ffffff");
+            badge.setAttribute("stroke-width", "2");
+            g.appendChild(badge);
+
+            const txt = document.createElementNS(ns, "text");
+            txt.setAttribute("x", String(st.x));
+            txt.setAttribute("y", String(st.y + 3.5));
+            txt.setAttribute("text-anchor", "middle");
+            txt.setAttribute("fill", "#ffffff");
+            txt.setAttribute("font-size", "10");
+            txt.setAttribute("font-weight", "800");
+            txt.textContent = labelText;
+            g.appendChild(txt);
+
+            markersGroup.appendChild(g);
+          };
+
+          if (selectedOriginId && selectedOriginId === selectedDestId) {
+            drawPin(selectedOriginId, "起/终", "#2563eb");
+          } else {
+            if (selectedOriginId) drawPin(selectedOriginId, "起", "#16a34a");
+            if (selectedDestId) drawPin(selectedDestId, "终", "#e11d48");
+          }
+        }
+      }
+
+      function renderRouteSummary() {
+        routeSummaryEl.innerHTML = "";
+
+        if (!selectedOriginId || !selectedDestId) {
+          routeSummaryEl.removeAttribute("data-total-time");
+          routeSummaryEl.removeAttribute("data-transfers");
+          const prompt = document.createElement("div");
+          prompt.className = "empty-state";
+          if (!selectedOriginId && !selectedDestId) {
+            prompt.innerHTML = `<strong>请选择起点与终点</strong>可以在上方输入框搜索站名，或直接点击右侧地铁线路图上的站点。`;
+          } else if (selectedOriginId && !selectedDestId) {
+            const st = graphIndex.stationsById.get(selectedOriginId);
+            prompt.innerHTML = `<strong>已选起点：${escapeHtml(st ? st.name : selectedOriginId)}</strong>请继续选择终点站以规划最佳路线。`;
+          } else {
+            const st = graphIndex.stationsById.get(selectedDestId);
+            prompt.innerHTML = `<strong>已选终点：${escapeHtml(st ? st.name : selectedDestId)}</strong>请继续选择起点站以规划最佳路线。`;
+          }
+          routeSummaryEl.appendChild(prompt);
+          return;
+        }
+
+        const result = computeRoute(selectedOriginId, selectedDestId, currentMode);
+        currentRouteResult = result;
+
+        if (!result) {
+          routeSummaryEl.removeAttribute("data-total-time");
+          routeSummaryEl.removeAttribute("data-transfers");
+          const fromName = graphIndex.stationsById.get(selectedOriginId)?.name || selectedOriginId;
+          const toName = graphIndex.stationsById.get(selectedDestId)?.name || selectedDestId;
+          const box = document.createElement("div");
+          box.className = "unreachable-card";
+          box.innerHTML = `<strong>无法到达该目的地</strong>未能找到从「${escapeHtml(fromName)}」到「${escapeHtml(toName)}」的连通轨道交通路线。`;
+          routeSummaryEl.appendChild(box);
+          return;
+        }
+
+        routeSummaryEl.setAttribute("data-total-time", String(result.totalTime));
+        routeSummaryEl.setAttribute("data-transfers", String(result.transfers));
+
+        const stopCount = Math.max(0, result.path.length - 1);
+        const kpiGrid = document.createElement("div");
+        kpiGrid.className = "kpi-grid";
+        kpiGrid.innerHTML = `
+          <div class="kpi-box">
+            <div class="kpi-val">${result.totalTime}<span>分钟</span></div>
+            <div class="kpi-label">预计总耗时</div>
+          </div>
+          <div class="kpi-box">
+            <div class="kpi-val">${result.transfers}<span>次</span></div>
+            <div class="kpi-label">换乘次数</div>
+          </div>
+          <div class="kpi-box">
+            <div class="kpi-val">${stopCount}<span>站</span></div>
+            <div class="kpi-label">途经站数</div>
+          </div>
+        `;
+        routeSummaryEl.appendChild(kpiGrid);
+
+        if (result.path.length === 1) {
+          const sameSt = graphIndex.stationsById.get(selectedOriginId);
+          const sameCard = document.createElement("div");
+          sameCard.className = "empty-state";
+          sameCard.innerHTML = `<strong>起点与终点相同（${escapeHtml(sameSt ? sameSt.name : selectedOriginId)}）</strong>无需乘车，总耗时 0 分钟，换乘 0 次。`;
+          routeSummaryEl.appendChild(sameCard);
+          return;
+        }
+
+        const detailedLegs = buildDetailedLegs(result);
+        const legsContainer = document.createElement("div");
+        legsContainer.className = "legs-container";
+
+        for (const leg of detailedLegs) {
+          const card = document.createElement("div");
+          card.className = "leg-card";
+          card.innerHTML = `
+            <div class="leg-bar" style="background:${escapeHtml(leg.lineColor)}"></div>
+            <div class="leg-header">
+              <span class="line-badge" style="background:${escapeHtml(leg.lineColor)}">${escapeHtml(leg.lineName)}</span>
+              <span class="leg-meta">${leg.stopCount} 站 · ${leg.legTime} 分钟</span>
+            </div>
+            <div class="leg-endpoints">
+              <span>${escapeHtml(leg.fromName)}</span>
+              <span class="leg-arrow">→</span>
+              <span>${escapeHtml(leg.toName)}</span>
+            </div>
+            <div class="leg-stops-list">途经：${leg.stations.map(escapeHtml).join(" → ")}</div>
+          `;
+          legsContainer.appendChild(card);
+
+          if (leg.transferAfter) {
+            const tr = leg.transferAfter;
+            const notice = document.createElement("div");
+            notice.className = "transfer-notice";
+            notice.innerHTML = `
+              <span class="transfer-dot"></span>
+              <span>在 ${escapeHtml(tr.stationName)} 站换乘 ${escapeHtml(tr.toLineName)}, 约 ${tr.transferTime} 分钟</span>
+            `;
+            legsContainer.appendChild(notice);
+          }
+        }
+
+        routeSummaryEl.appendChild(legsContainer);
+      }
+
+      function escapeHtml(str) {
+        return String(str)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+      }
+
+      function syncInputsAndReplan() {
+        const originSt = selectedOriginId ? graphIndex.stationsById.get(selectedOriginId) : null;
+        const destSt = selectedDestId ? graphIndex.stationsById.get(selectedDestId) : null;
+        originInputEl.value = originSt ? originSt.name : "";
+        destInputEl.value = destSt ? destSt.name : "";
+        currentRouteResult = null;
+        renderRouteSummary();
+        updateMapHighlight();
+      }
+
+      function handleStationClick(stationId) {
+        if (!graphIndex || !graphIndex.stationsById.has(stationId)) return;
+        if (!selectedOriginId || (selectedOriginId && selectedDestId)) {
+          selectedOriginId = stationId;
+          selectedDestId = null;
+        } else {
+          selectedDestId = stationId;
+        }
+        closeAllSuggestions();
+        syncInputsAndReplan();
+      }
+
+      function findStationByInputText(rawText) {
+        if (!graphIndex || !rawText) return null;
+        const trimmed = rawText.trim();
+        if (!trimmed) return null;
+
+        // Exact name match
+        if (graphIndex.stationsByName.has(trimmed)) {
+          return graphIndex.stationsByName.get(trimmed);
+        }
+        // Case-insensitive name or ID match
+        const lower = trimmed.toLowerCase();
+        for (const st of graphIndex.stationsById.values()) {
+          if (st.name.toLowerCase() === lower || st.id.toLowerCase() === lower) {
+            return st;
+          }
+        }
+        return null;
+      }
+
+      function getMatchingStations(query) {
+        if (!graphIndex) return [];
+        const q = (query || "").trim().toLowerCase();
+        const all = Array.from(graphIndex.stationsById.values());
+        if (!q) return all;
+
+        const exact = [];
+        const starts = [];
+        const contains = [];
+        for (const st of all) {
+          const nLower = st.name.toLowerCase();
+          const idLower = st.id.toLowerCase();
+          if (nLower === q || idLower === q) exact.push(st);
+          else if (nLower.startsWith(q) || idLower.startsWith(q)) starts.push(st);
+          else if (nLower.includes(q) || idLower.includes(q)) contains.push(st);
+        }
+        return [...exact, ...starts, ...contains];
+      }
+
+      function closeAllSuggestions() {
+        originSugEl.classList.remove("open");
+        destSugEl.classList.remove("open");
+      }
+
+      function setupAutocomplete(inputEl, dropdownEl, role) {
+        let activeIndex = -1;
+        let currentMatches = [];
+
+        function renderList(query) {
+          currentMatches = getMatchingStations(query);
+          dropdownEl.innerHTML = "";
+          activeIndex = -1;
+
+          if (currentMatches.length === 0) {
+            dropdownEl.classList.remove("open");
+            return;
+          }
+
+          currentMatches.forEach((st) => {
+            const item = document.createElement("div");
+            item.className = "suggestion-item";
+            item.setAttribute("role", "option");
+
+            const nameSpan = document.createElement("span");
+            nameSpan.className = "suggestion-name";
+            nameSpan.textContent = st.name;
+
+            const linesWrap = document.createElement("div");
+            linesWrap.className = "suggestion-lines";
+            const lineIds = graphIndex.stationLines.get(st.id) || [];
+            for (const lid of lineIds) {
+              const lObj = graphIndex.linesById.get(lid);
+              if (!lObj) continue;
+              const pill = document.createElement("span");
+              pill.className = "mini-line-pill";
+              pill.style.backgroundColor = lObj.color;
+              pill.textContent = lObj.name;
+              linesWrap.appendChild(pill);
+            }
+
+            item.appendChild(nameSpan);
+            item.appendChild(linesWrap);
+
+            item.addEventListener("mousedown", (e) => {
+              e.preventDefault();
+              selectStation(st);
+            });
+            dropdownEl.appendChild(item);
+          });
+
+          dropdownEl.classList.add("open");
+        }
+
+        function selectStation(st) {
+          if (!st) return;
+          if (role === "origin") {
+            selectedOriginId = st.id;
+          } else {
+            selectedDestId = st.id;
+          }
+          dropdownEl.classList.remove("open");
+          syncInputsAndReplan();
+        }
+
+        inputEl.addEventListener("focus", () => {
+          renderList(inputEl.value);
+        });
+
+        inputEl.addEventListener("input", () => {
+          renderList(inputEl.value);
+          const exact = findStationByInputText(inputEl.value);
+          if (!inputEl.value.trim()) {
+            if (role === "origin") selectedOriginId = null;
+            else selectedDestId = null;
+            currentRouteResult = null;
+            renderRouteSummary();
+            updateMapHighlight();
+          } else if (exact) {
+            if (role === "origin") selectedOriginId = exact.id;
+            else selectedDestId = exact.id;
+            currentRouteResult = null;
+            renderRouteSummary();
+            updateMapHighlight();
+          }
+        });
+
+        inputEl.addEventListener("keydown", (e) => {
+          const items = dropdownEl.querySelectorAll(".suggestion-item");
+          if (e.key === "ArrowDown") {
+            e.preventDefault();
+            if (!dropdownEl.classList.contains("open")) {
+              renderList(inputEl.value);
+              return;
+            }
+            if (items.length > 0) {
+              activeIndex = (activeIndex + 1) % items.length;
+              items.forEach((el, idx) => el.classList.toggle("active", idx === activeIndex));
+              items[activeIndex].scrollIntoView({ block: "nearest" });
+            }
+          } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            if (items.length > 0) {
+              activeIndex = (activeIndex - 1 + items.length) % items.length;
+              items.forEach((el, idx) => el.classList.toggle("active", idx === activeIndex));
+              items[activeIndex].scrollIntoView({ block: "nearest" });
+            }
+          } else if (e.key === "Enter") {
+            e.preventDefault();
+            const exact = findStationByInputText(inputEl.value);
+            if (exact) {
+              selectStation(exact);
+            } else if (activeIndex >= 0 && currentMatches[activeIndex]) {
+              selectStation(currentMatches[activeIndex]);
+            } else if (currentMatches.length > 0) {
+              selectStation(currentMatches[0]);
+            }
+          } else if (e.key === "Escape") {
+            dropdownEl.classList.remove("open");
+          }
+        });
+
+        inputEl.addEventListener("blur", () => {
+          setTimeout(() => {
+            dropdownEl.classList.remove("open");
+            const exact = findStationByInputText(inputEl.value);
+            if (exact) {
+              if (role === "origin" && selectedOriginId !== exact.id) {
+                selectedOriginId = exact.id;
+                syncInputsAndReplan();
+              } else if (role === "dest" && selectedDestId !== exact.id) {
+                selectedDestId = exact.id;
+                syncInputsAndReplan();
+              }
+            }
+          }, 120);
+        });
+      }
+
+      function setMode(mode) {
+        currentMode = mode === "transfers" ? "transfers" : "time";
+        const isTime = currentMode === "time";
+        modeTimeBtn.classList.toggle("active", isTime);
+        modeTimeBtn.setAttribute("aria-pressed", String(isTime));
+        modeTransfersBtn.classList.toggle("active", !isTime);
+        modeTransfersBtn.setAttribute("aria-pressed", String(!isTime));
+        renderRouteSummary();
+        updateMapHighlight();
+      }
+
+      function loadNetwork(network) {
+        if (!network || typeof network !== "object") return;
+        currentNetwork = network;
+        graphIndex = buildGraphIndex(network);
+
+        selectedOriginId = null;
+        selectedDestId = null;
+        currentRouteResult = null;
+        originInputEl.value = "";
+        destInputEl.value = "";
+        closeAllSuggestions();
+
+        networkTitleEl.textContent = network.name || "城市轨道交通线网";
+        const lineCount = (network.lines || []).length;
+        const stationCount = (network.stations || []).length;
+        networkStatsEl.textContent = `${lineCount} 条线路 · ${stationCount} 座车站`;
+
+        renderLegend();
+        renderNetworkMap();
+        renderRouteSummary();
+        updateMapHighlight();
+      }
+
+      // Zoom and Pan bindings
+      function zoomByFactor(factor) {
+        const cx = activeViewBox.x + activeViewBox.w / 2;
+        const cy = activeViewBox.y + activeViewBox.h / 2;
+        const nw = Math.max(baseViewBox.w * 0.25, Math.min(baseViewBox.w * 2.5, activeViewBox.w * factor));
+        const nh = Math.max(baseViewBox.h * 0.25, Math.min(baseViewBox.h * 2.5, activeViewBox.h * factor));
+        activeViewBox = {
+          x: cx - nw / 2,
+          y: cy - nh / 2,
+          w: nw,
+          h: nh
+        };
+        applyViewBox();
+      }
+
+      zoomInBtn.addEventListener("click", () => zoomByFactor(0.8));
+      zoomOutBtn.addEventListener("click", () => zoomByFactor(1.25));
+      zoomResetBtn.addEventListener("click", () => {
+        activeViewBox = { ...baseViewBox };
+        applyViewBox();
+      });
+
+      svgEl.addEventListener("wheel", (e) => {
+        e.preventDefault();
+        zoomByFactor(e.deltaY < 0 ? 0.88 : 1.14);
+      }, { passive: false });
+
+      svgEl.addEventListener("pointerdown", (e) => {
+        if (e.target.closest(".station-node")) return;
+        isPanning = true;
+        panStart = {
+          x: e.clientX,
+          y: e.clientY,
+          vx: activeViewBox.x,
+          vy: activeViewBox.y
+        };
+      });
+
+      window.addEventListener("pointermove", (e) => {
+        if (!isPanning) return;
+        const rect = svgEl.getBoundingClientRect();
+        if (rect.width === 0 || rect.height === 0) return;
+        const dx = (e.clientX - panStart.x) * (activeViewBox.w / rect.width);
+        const dy = (e.clientY - panStart.y) * (activeViewBox.h / rect.height);
+        activeViewBox.x = panStart.vx - dx;
+        activeViewBox.y = panStart.vy - dy;
+        applyViewBox();
+      });
+
+      window.addEventListener("pointerup", () => {
+        isPanning = false;
+      });
+
+      // Controls bindings
+      setupAutocomplete(originInputEl, originSugEl, "origin");
+      setupAutocomplete(destInputEl, destSugEl, "dest");
+
+      clearOriginBtn.addEventListener("click", () => {
+        selectedOriginId = null;
+        syncInputsAndReplan();
+      });
+
+      clearDestBtn.addEventListener("click", () => {
+        selectedDestId = null;
+        syncInputsAndReplan();
+      });
+
+      swapBtn.addEventListener("click", () => {
+        const tmpId = selectedOriginId;
+        selectedOriginId = selectedDestId;
+        selectedDestId = tmpId;
+
+        const tmpVal = originInputEl.value;
+        originInputEl.value = destInputEl.value;
+        destInputEl.value = tmpVal;
+
+        const resolvedOrigin = findStationByInputText(originInputEl.value);
+        const resolvedDest = findStationByInputText(destInputEl.value);
+        if (resolvedOrigin) selectedOriginId = resolvedOrigin.id;
+        if (resolvedDest) selectedDestId = resolvedDest.id;
+
+        closeAllSuggestions();
+        syncInputsAndReplan();
+      });
+
+      modeTimeBtn.addEventListener("click", () => setMode("time"));
+      modeTransfersBtn.addEventListener("click", () => setMode("transfers"));
+
+      document.addEventListener("click", (e) => {
+        if (!e.target.closest(".field-wrap")) {
+          closeAllSuggestions();
+        }
+      });
+
+      // Expose Benchmark API
+      window.metroBench = {
+        loadNetwork(network) {
+          loadNetwork(network);
+        },
+        route(fromId, toId, mode) {
+          return computeRoute(fromId, toId, mode);
+        }
+      };
+
+      // Initialize with embedded default network
+      loadNetwork(DEFAULT_NETWORK);
+    })();
+  </script>
+</body>
+</html>
