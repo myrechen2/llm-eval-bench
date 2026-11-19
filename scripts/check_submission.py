@@ -66,19 +66,22 @@ def anonymity_checks(sub: Path, sid: str) -> None:
     branch = (git("rev-parse", "--abbrev-ref", "HEAD") or "").strip()
     report(branch == f"submit/{sid}", f"on branch submit/{sid} (current: {branch or '?'})")
     base = "origin/main" if git("rev-parse", "--verify", "-q", "origin/main") else "main"
-    log = git("log", "--format=%an <%ae>%n%B%n----", f"{base}..HEAD")
-    if log is None:
+    log = git("log", "--format=%B", f"{base}..HEAD")
+    authors_out = git("log", "--format=%an <%ae>|%cn <%ce>", f"{base}..HEAD")
+    if log is None or authors_out is None:
         report(False, "could not read git log")
         return
     bad = [l for l in log.splitlines() if IDENTITY_RX.search(l)]
-    authors = {l for l in log.splitlines() if l.endswith(">") and "<" in l}
+    authors = {a for l in authors_out.splitlines() for a in l.split("|") if a}
     ok_authors = authors <= {"anon <anon@bench.invalid>"}
-    fix = (f"\n           fix (squashes your commits into one, anonymous):\n"
-           f"             git reset --soft $(git merge-base HEAD {base}) && "
-           f"git -c user.name=anon -c user.email=anon@bench.invalid commit -m \"{sid}: submission\"")
-    report(not bad, "commit messages contain no identifying text" + ("" if not bad else "\n           " + "\n           ".join(bad[:10]) + fix))
-    report(ok_authors, "all commits authored as anon <anon@bench.invalid>" + ("" if ok_authors else f" (found: {sorted(authors)})" + fix))
-
+    report(not bad, "commit messages contain no identifying text"
+           + ("" if not bad else "\n" + "\n".join("           " + l for l in bad[:10])))
+    report(ok_authors, "all commits authored/committed as anon <anon@bench.invalid>"
+           + ("" if ok_authors else f" (found: {sorted(authors)})"))
+    if bad or not ok_authors:
+        print("           fix: squash your commits into one anonymous commit, then re-run this check:\n"
+              f"             git reset --soft $(git merge-base HEAD {base}) && "
+              f"git -c user.name=anon -c user.email=anon@bench.invalid commit -m \"{sid}: submission\"")
 
 def main(sid: str) -> int:
     if not re.fullmatch(r"[a-z0-9][a-z0-9._-]*", sid):
