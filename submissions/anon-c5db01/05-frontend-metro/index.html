@@ -1,0 +1,1997 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>城市地铁线路图与路径规划器</title>
+  <style>
+    :root {
+      --bg: #f3f5f8;
+      --surface: #ffffff;
+      --surface-alt: #f8fafc;
+      --surface-hover: #eef2f7;
+      --border: #dfe5ee;
+      --text: #141c26;
+      --text-muted: #5b6878;
+      --accent: #1b6ec2;
+      --accent-soft: rgba(27, 110, 194, 0.12);
+      --origin-color: #16a34a;
+      --dest-color: #dc2626;
+      --map-bg: #fafbfd;
+      --map-grid: rgba(100, 116, 139, 0.08);
+      --station-fill: #ffffff;
+      --station-ring: #1e293b;
+      --label-bg: rgba(255, 255, 255, 0.88);
+      --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.08);
+      --shadow-md: 0 8px 24px rgba(15, 23, 42, 0.1);
+      --radius: 12px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --bg: #0d1117;
+        --surface: #161b22;
+        --surface-alt: #1c222b;
+        --surface-hover: #242c37;
+        --border: #2d3748;
+        --text: #e6edf3;
+        --text-muted: #93a1b3;
+        --accent: #4c9aff;
+        --accent-soft: rgba(76, 154, 255, 0.16);
+        --origin-color: #22c55e;
+        --dest-color: #f87171;
+        --map-bg: #0f141b;
+        --map-grid: rgba(148, 163, 184, 0.07);
+        --station-fill: #161b22;
+        --station-ring: #e2e8f0;
+        --label-bg: rgba(15, 20, 27, 0.88);
+        --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.35);
+        --shadow-md: 0 10px 28px rgba(0, 0, 0, 0.45);
+      }
+    }
+
+    :root[data-theme="dark"] {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --surface-alt: #1c222b;
+      --surface-hover: #242c37;
+      --border: #2d3748;
+      --text: #e6edf3;
+      --text-muted: #93a1b3;
+      --accent: #4c9aff;
+      --accent-soft: rgba(76, 154, 255, 0.16);
+      --origin-color: #22c55e;
+      --dest-color: #f87171;
+      --map-bg: #0f141b;
+      --map-grid: rgba(148, 163, 184, 0.07);
+      --station-fill: #161b22;
+      --station-ring: #e2e8f0;
+      --label-bg: rgba(15, 20, 27, 0.88);
+      --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.35);
+      --shadow-md: 0 10px 28px rgba(0, 0, 0, 0.45);
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      max-width: 100%;
+      overflow-x: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: 390px minmax(0, 1fr);
+      height: 100vh;
+      width: 100%;
+      max-width: 100%;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      min-width: 0;
+      height: 100vh;
+      overflow: hidden;
+      z-index: 2;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 16px 18px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .brand-icon {
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      background: var(--accent);
+      color: #fff;
+      display: grid;
+      place-items: center;
+      font-weight: 700;
+      font-size: 15px;
+      flex-shrink: 0;
+    }
+
+    .brand-title {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .brand-sub {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .icon-btn {
+      border: 1px solid var(--border);
+      background: var(--surface-alt);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 6px 10px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      transition: background 0.15s ease, border-color 0.15s ease;
+      flex-shrink: 0;
+    }
+
+    .icon-btn:hover {
+      background: var(--surface-hover);
+    }
+
+    .planner-box {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .inputs-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .inputs-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .field {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .field-dot {
+      position: absolute;
+      left: 12px;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      pointer-events: none;
+    }
+
+    .field-dot.origin {
+      background: var(--origin-color);
+    }
+
+    .field-dot.dest {
+      background: var(--dest-color);
+    }
+
+    .station-input {
+      width: 100%;
+      min-width: 0;
+      padding: 9px 32px 9px 30px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface-alt);
+      color: var(--text);
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+    }
+
+    .station-input:focus {
+      border-color: var(--accent);
+      background: var(--surface);
+      box-shadow: 0 0 0 3px var(--accent-soft);
+    }
+
+    .clear-field {
+      position: absolute;
+      right: 8px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 16px;
+      line-height: 1;
+      padding: 4px;
+      border-radius: 50%;
+      display: none;
+    }
+
+    .clear-field.visible {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .clear-field:hover {
+      background: var(--surface-hover);
+      color: var(--text);
+    }
+
+    .suggestions {
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      right: 0;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      box-shadow: var(--shadow-md);
+      max-height: 220px;
+      overflow-y: auto;
+      z-index: 30;
+      display: none;
+    }
+
+    .suggestions.open {
+      display: block;
+    }
+
+    .suggestion-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 8px 12px;
+      cursor: pointer;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .suggestion-item:last-child {
+      border-bottom: none;
+    }
+
+    .suggestion-item:hover,
+    .suggestion-item.active {
+      background: var(--surface-hover);
+    }
+
+    .suggestion-name {
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .suggestion-id {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    .line-dots {
+      display: inline-flex;
+      gap: 3px;
+      align-items: center;
+    }
+
+    .line-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    .swap-btn {
+      width: 38px;
+      height: 38px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface-alt);
+      color: var(--text);
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+      font-size: 16px;
+      transition: background 0.15s ease, transform 0.15s ease;
+    }
+
+    .swap-btn:hover {
+      background: var(--surface-hover);
+      transform: rotate(180deg);
+    }
+
+    .mode-bar {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      background: var(--surface-alt);
+      padding: 4px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+    }
+
+    .mode-btn {
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-weight: 600;
+      font-size: 13px;
+      padding: 7px 10px;
+      border-radius: 7px;
+      cursor: pointer;
+      transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .mode-btn.active {
+      background: var(--surface);
+      color: var(--accent);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .hint-text {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin: 0;
+    }
+
+    /* Summary area */
+    .summary-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 18px;
+      min-height: 0;
+    }
+
+    .empty-state {
+      padding: 20px 14px;
+      border: 1px dashed var(--border);
+      border-radius: var(--radius);
+      text-align: center;
+      color: var(--text-muted);
+      background: var(--surface-alt);
+    }
+
+    .empty-state strong {
+      display: block;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+
+    .metrics-card {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 16px;
+      background: var(--accent-soft);
+      border: 1px solid rgba(27, 110, 194, 0.25);
+      border-radius: var(--radius);
+      margin-bottom: 16px;
+    }
+
+    .metric-main {
+      display: flex;
+      align-items: baseline;
+      gap: 4px;
+    }
+
+    .metric-val {
+      font-size: 28px;
+      font-weight: 800;
+      color: var(--accent);
+      line-height: 1.1;
+    }
+
+    .metric-unit {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--accent);
+    }
+
+    .metric-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      justify-content: flex-end;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 9px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .legs-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .leg-card {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 14px;
+      background: var(--surface-alt);
+    }
+
+    .leg-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    .line-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 2px 9px;
+      border-radius: 6px;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .leg-meta {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .leg-route {
+      font-size: 14px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .leg-stops {
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    .transfer-notice {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 9px;
+      background: var(--surface);
+      border: 1px dashed var(--border);
+      font-size: 12px;
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .transfer-icon {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--accent-soft);
+      color: var(--accent);
+      display: inline-grid;
+      place-items: center;
+      font-size: 12px;
+      flex-shrink: 0;
+    }
+
+    /* Map Canvas */
+    .map-stage {
+      position: relative;
+      background: var(--map-bg);
+      background-image:
+        linear-gradient(to right, var(--map-grid) 1px, transparent 1px),
+        linear-gradient(to bottom, var(--map-grid) 1px, transparent 1px);
+      background-size: 32px 32px;
+      overflow: hidden;
+      min-width: 0;
+      min-height: 0;
+      height: 100vh;
+    }
+
+    #metro-svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+      user-select: none;
+      touch-action: none;
+      cursor: grab;
+    }
+
+    #metro-svg.panning {
+      cursor: grabbing;
+    }
+
+    .legend-panel {
+      position: absolute;
+      top: 14px;
+      left: 14px;
+      max-width: calc(100% - 120px);
+      max-height: 110px;
+      overflow-y: auto;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 8px 10px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      box-shadow: var(--shadow-sm);
+      z-index: 5;
+      opacity: 0.94;
+    }
+
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--text);
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+
+    .legend-item:hover,
+    .legend-item.active {
+      background: var(--surface-hover);
+      border-color: var(--border);
+    }
+
+    .legend-swatch {
+      width: 14px;
+      height: 4px;
+      border-radius: 2px;
+      display: inline-block;
+    }
+
+    .map-controls {
+      position: absolute;
+      right: 14px;
+      bottom: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      z-index: 5;
+    }
+
+    .zoom-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 9px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: var(--shadow-sm);
+      display: grid;
+      place-items: center;
+    }
+
+    .zoom-btn:hover {
+      background: var(--surface-hover);
+    }
+
+    /* SVG styles */
+    .line-path {
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      transition: opacity 0.2s ease, stroke-width 0.2s ease;
+    }
+
+    .line-casing {
+      fill: none;
+      stroke: var(--map-bg);
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      transition: opacity 0.2s ease;
+    }
+
+    .route-glow {
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      opacity: 0.28;
+    }
+
+    .route-flow {
+      fill: none;
+      stroke: #ffffff;
+      stroke-width: 2.2;
+      stroke-linecap: round;
+      stroke-dasharray: 6 12;
+      opacity: 0.78;
+      animation: flowDash 1.4s linear infinite;
+    }
+
+    @keyframes flowDash {
+      to { stroke-dashoffset: -18; }
+    }
+
+    .station-group {
+      cursor: pointer;
+      transition: opacity 0.2s ease;
+    }
+
+    .station-hit {
+      fill: transparent;
+    }
+
+    .station-label {
+      font-size: 11.5px;
+      font-weight: 600;
+      fill: var(--text);
+      paint-order: stroke;
+      stroke: var(--label-bg);
+      stroke-width: 3.5px;
+      stroke-linejoin: round;
+      pointer-events: none;
+    }
+
+    .station-label.interchange {
+      font-weight: 700;
+      font-size: 12px;
+    }
+
+    .dimmed {
+      opacity: 0.16;
+    }
+
+    .pin-label {
+      font-size: 10px;
+      font-weight: 800;
+      fill: #ffffff;
+      text-anchor: middle;
+      dominant-baseline: central;
+      pointer-events: none;
+    }
+
+    /* Mobile / narrow screens */
+    @media (max-width: 900px) {
+      .app {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto auto;
+        height: auto;
+        min-height: 100vh;
+      }
+
+      .sidebar {
+        height: auto;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+        overflow: visible;
+      }
+
+      .summary-scroll {
+        overflow-y: visible;
+      }
+
+      .map-stage {
+        height: 460px;
+        min-height: 360px;
+      }
+
+      .legend-panel {
+        max-width: calc(100% - 70px);
+        padding: 6px 8px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <header class="header">
+        <div class="brand">
+          <div class="brand-icon" aria-hidden="true">M</div>
+          <div style="min-width:0">
+            <h1 class="brand-title" id="network-title">地铁线路规划器</h1>
+            <div class="brand-sub" id="network-stats">加载中…</div>
+          </div>
+        </div>
+        <button type="button" class="icon-btn" id="theme-btn" title="切换浅色/深色主题">主题</button>
+      </header>
+
+      <section class="planner-box" aria-label="行程规划">
+        <div class="inputs-row">
+          <div class="inputs-stack">
+            <div class="field">
+              <span class="field-dot origin" aria-hidden="true"></span>
+              <input
+                id="origin-input"
+                class="station-input"
+                type="text"
+                placeholder="输入起点站名，或点击地图选站"
+                autocomplete="off"
+                aria-label="起点站"
+              />
+              <button type="button" class="clear-field" id="clear-origin" aria-label="清除起点">&times;</button>
+              <div class="suggestions" id="origin-suggestions" role="listbox"></div>
+            </div>
+            <div class="field">
+              <span class="field-dot dest" aria-hidden="true"></span>
+              <input
+                id="destination-input"
+                class="station-input"
+                type="text"
+                placeholder="输入终点站名，或点击地图选站"
+                autocomplete="off"
+                aria-label="终点站"
+              />
+              <button type="button" class="clear-field" id="clear-dest" aria-label="清除终点">&times;</button>
+              <div class="suggestions" id="destination-suggestions" role="listbox"></div>
+            </div>
+          </div>
+          <button type="button" class="swap-btn" id="swap-btn" title="交换起终点" aria-label="交换起终点">&#8645;</button>
+        </div>
+
+        <div class="mode-bar" role="group" aria-label="规划偏好">
+          <button type="button" class="mode-btn active" id="mode-time" aria-pressed="true">最短时间</button>
+          <button type="button" class="mode-btn" id="mode-transfers" aria-pressed="false">最少换乘</button>
+        </div>
+
+        <p class="hint-text">提示：点击地图站点可依次设定起点与终点；输入站名按 Enter 可直接选中。</p>
+      </section>
+
+      <section class="summary-scroll">
+        <div id="route-summary">
+          <div class="empty-state">
+            <strong>选择起点与终点</strong>
+            在上方输入站名或直接在右侧线路图上点击任意站点开始规划。
+          </div>
+        </div>
+      </section>
+    </aside>
+
+    <main class="map-stage" aria-label="地铁线路图">
+      <div class="legend-panel" id="line-legend" aria-label="线路图例"></div>
+      <svg id="metro-svg" viewBox="0 0 1200 840" role="img" aria-label="城市地铁线网图"></svg>
+      <div class="map-controls">
+        <button type="button" class="zoom-btn" id="zoom-in" title="放大" aria-label="放大地图">+</button>
+        <button type="button" class="zoom-btn" id="zoom-out" title="缩小" aria-label="缩小地图">&minus;</button>
+        <button type="button" class="zoom-btn" id="zoom-reset" title="重置视图" aria-label="重置地图视图">&#8634;</button>
+      </div>
+    </main>
+  </div>
+
+  <script>
+  (function () {
+    "use strict";
+
+    const DEFAULT_NETWORK = {
+      "name": "滨海市轨道交通(示例)",
+      "transferTime": 4,
+      "stations": [
+        {"id": "S01", "name": "西港", "x": 60, "y": 360},
+        {"id": "S02", "name": "渔人码头", "x": 140, "y": 355},
+        {"id": "S03", "name": "老城门", "x": 220, "y": 350},
+        {"id": "S04", "name": "鼓楼", "x": 300, "y": 345},
+        {"id": "S05", "name": "文庙", "x": 385, "y": 347},
+        {"id": "S06", "name": "中央广场", "x": 470, "y": 350, "transferTime": 7},
+        {"id": "S07", "name": "新华路", "x": 560, "y": 350},
+        {"id": "S08", "name": "体育中心", "x": 640, "y": 350, "transferTime": 2},
+        {"id": "S09", "name": "东湖", "x": 720, "y": 352},
+        {"id": "S10", "name": "科技园", "x": 800, "y": 356},
+        {"id": "S11", "name": "会展中心", "x": 880, "y": 360},
+        {"id": "S12", "name": "东港", "x": 955, "y": 365},
+        {"id": "S13", "name": "北站", "x": 470, "y": 40},
+        {"id": "S14", "name": "植物园", "x": 470, "y": 110},
+        {"id": "S15", "name": "大学城", "x": 470, "y": 180},
+        {"id": "S16", "name": "图书馆", "x": 470, "y": 255},
+        {"id": "S17", "name": "人民医院", "x": 470, "y": 430},
+        {"id": "S18", "name": "南门", "x": 470, "y": 515},
+        {"id": "S19", "name": "南站", "x": 470, "y": 625, "transferTime": 6},
+        {"id": "S20", "name": "青山", "x": 150, "y": 90},
+        {"id": "S21", "name": "枫林", "x": 230, "y": 150},
+        {"id": "S22", "name": "太学", "x": 310, "y": 205},
+        {"id": "S23", "name": "银杏路", "x": 560, "y": 290},
+        {"id": "S24", "name": "南湖公园", "x": 720, "y": 435},
+        {"id": "S25", "name": "软件园", "x": 800, "y": 520},
+        {"id": "S26", "name": "滨江", "x": 865, "y": 600},
+        {"id": "S30", "name": "云栖", "x": 600, "y": 192},
+        {"id": "S31", "name": "望江", "x": 690, "y": 255},
+        {"id": "S32", "name": "观澜", "x": 640, "y": 500},
+        {"id": "S33", "name": "西苑", "x": 330, "y": 485},
+        {"id": "S34", "name": "柳岸", "x": 265, "y": 420},
+        {"id": "S35", "name": "紫金", "x": 390, "y": 172},
+        {"id": "S40", "name": "机场", "x": 935, "y": 70},
+        {"id": "S41", "name": "港湾新城", "x": 890, "y": 170},
+        {"id": "S42", "name": "金融街", "x": 885, "y": 265},
+        {"id": "S43", "name": "海洋馆", "x": 880, "y": 450},
+        {"id": "S44", "name": "江心岛", "x": 690, "y": 610}
+      ],
+      "lines": [
+        {
+          "id": "L1", "name": "1号线", "color": "#d7263d", "loop": false,
+          "stations": ["S01", "S02", "S03", "S04", "S05", "S06", "S07", "S08", "S09", "S10", "S11", "S12"],
+          "times": [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3]
+        },
+        {
+          "id": "L2", "name": "2号线", "color": "#1b6ec2", "loop": false,
+          "stations": ["S13", "S14", "S15", "S16", "S06", "S17", "S18", "S19"],
+          "times": [2, 2, 3, 3, 3, 3, 3]
+        },
+        {
+          "id": "L3", "name": "3号线", "color": "#2a9d4b", "loop": false,
+          "stations": ["S20", "S21", "S22", "S16", "S23", "S08", "S24", "S25", "S26"],
+          "times": [3, 3, 5, 3, 3, 4, 4, 3]
+        },
+        {
+          "id": "L4", "name": "4号线(环线)", "color": "#f08a24", "loop": true,
+          "stations": ["S15", "S30", "S31", "S09", "S24", "S32", "S18", "S33", "S34", "S04", "S22", "S35"],
+          "times": [4, 3, 3, 3, 3, 5, 4, 3, 3, 4, 3, 3]
+        },
+        {
+          "id": "L5", "name": "5号线(机场线)", "color": "#7b3fa0", "loop": false,
+          "stations": ["S40", "S41", "S42", "S11", "S43", "S25", "S44", "S19"],
+          "times": [2, 2, 2, 2, 2, 3, 4]
+        }
+      ]
+    };
+
+    const SVG_NS = "http://www.w3.org/2000/svg";
+    const VIEW_W = 1200;
+    const VIEW_H = 840;
+    const PAD = 88;
+
+    // ---------------------- Graph & Routing Engine ----------------------
+    class MinHeap {
+      constructor(compareFn) {
+        this.data = [];
+        this.cmp = compareFn;
+      }
+      get size() { return this.data.length; }
+      push(item) {
+        const a = this.data;
+        a.push(item);
+        let i = a.length - 1;
+        while (i > 0) {
+          const p = (i - 1) >> 1;
+          if (this.cmp(a[i], a[p]) < 0) {
+            const t = a[i]; a[i] = a[p]; a[p] = t;
+            i = p;
+          } else break;
+        }
+      }
+      pop() {
+        const a = this.data;
+        const top = a[0];
+        const last = a.pop();
+        if (a.length > 0) {
+          a[0] = last;
+          let i = 0;
+          const n = a.length;
+          while (true) {
+            let best = i;
+            const l = (i << 1) + 1;
+            const r = l + 1;
+            if (l < n && this.cmp(a[l], a[best]) < 0) best = l;
+            if (r < n && this.cmp(a[r], a[best]) < 0) best = r;
+            if (best === i) break;
+            const t = a[i]; a[i] = a[best]; a[best] = t;
+            i = best;
+          }
+        }
+        return top;
+      }
+    }
+
+    function buildGraph(network) {
+      const stations = network.stations || [];
+      const lines = network.lines || [];
+      const defaultTransfer = Number(network.transferTime ?? 0);
+
+      const stationById = new Map();
+      const stationIdxById = new Map();
+      stations.forEach((s, idx) => {
+        stationById.set(s.id, s);
+        stationIdxById.set(s.id, idx);
+      });
+
+      const lineById = new Map();
+      const lineIdxById = new Map();
+      lines.forEach((l, idx) => {
+        lineById.set(l.id, l);
+        lineIdxById.set(l.id, idx);
+      });
+
+      const stationLines = stations.map(() => []);
+      // Nodes:
+      // 0 .. S-1 : HUB node for each station sIdx
+      // S .. S+K-1 : ride state (sIdx, lIdx)
+      const S = stations.length;
+      const adj = Array.from({ length: S }, () => []);
+      const nodeStation = new Array(S);
+      const nodeLine = new Array(S);
+      for (let s = 0; s < S; s++) {
+        nodeStation[s] = s;
+        nodeLine[s] = -1; // HUB
+      }
+
+      const stateNodeMap = new Map(); // `${sIdx}:${lIdx}` -> nodeId
+      function getRideNode(sIdx, lIdx) {
+        const key = sIdx + ":" + lIdx;
+        let id = stateNodeMap.get(key);
+        if (id === undefined) {
+          id = adj.length;
+          stateNodeMap.set(key, id);
+          adj.push([]);
+          nodeStation.push(sIdx);
+          nodeLine.push(lIdx);
+        }
+        return id;
+      }
+
+      const rideNodesByStation = Array.from({ length: S }, () => []);
+
+      lines.forEach((line, lIdx) => {
+        const stIds = line.stations || [];
+        const times = line.times || [];
+        const uniqueInLine = new Set();
+
+        for (let i = 0; i < stIds.length; i++) {
+          const sIdx = stationIdxById.get(stIds[i]);
+          if (sIdx === undefined) continue;
+          if (!uniqueInLine.has(sIdx)) {
+            uniqueInLine.add(sIdx);
+            stationLines[sIdx].push(line);
+            const rNode = getRideNode(sIdx, lIdx);
+            rideNodesByStation[sIdx].push(rNode);
+          }
+        }
+
+        const edgeCount = line.loop ? stIds.length : Math.max(0, stIds.length - 1);
+        for (let i = 0; i < edgeCount; i++) {
+          const uId = stIds[i];
+          const vId = stIds[(i + 1) % stIds.length];
+          const uIdx = stationIdxById.get(uId);
+          const vIdx = stationIdxById.get(vId);
+          if (uIdx === undefined || vIdx === undefined) continue;
+          const dt = Number(times[i] ?? 0);
+          const nu = getRideNode(uIdx, lIdx);
+          const nv = getRideNode(vIdx, lIdx);
+          adj[nu].push({ to: nv, dt, tr: 0 });
+          adj[nv].push({ to: nu, dt, tr: 0 });
+        }
+      });
+
+      // Connect ride nodes to HUB at interchange stations
+      for (let sIdx = 0; sIdx < S; sIdx++) {
+        const rNodes = rideNodesByStation[sIdx];
+        if (rNodes.length >= 2) {
+          const st = stations[sIdx];
+          const tCost = (st.transferTime !== undefined && st.transferTime !== null)
+            ? Number(st.transferTime)
+            : defaultTransfer;
+          for (const rn of rNodes) {
+            adj[rn].push({ to: sIdx, dt: tCost, tr: 1 });
+            adj[sIdx].push({ to: rn, dt: 0, tr: 0 });
+          }
+        }
+      }
+
+      return {
+        network,
+        stations,
+        lines,
+        defaultTransfer,
+        stationById,
+        stationIdxById,
+        lineById,
+        stationLines,
+        rideNodesByStation,
+        adj,
+        nodeStation,
+        nodeLine
+      };
+    }
+
+    function solveRoute(graph, fromId, toId, mode) {
+      const fromIdx = graph.stationIdxById.get(fromId);
+      const toIdx = graph.stationIdxById.get(toId);
+      if (fromIdx === undefined || toIdx === undefined) return null;
+      if (fromIdx === toIdx) {
+        return { totalTime: 0, transfers: 0, path: [fromId], legs: [] };
+      }
+
+      const startNodes = graph.rideNodesByStation[fromIdx];
+      const endNodes = graph.rideNodesByStation[toIdx];
+      if (!startNodes.length || !endNodes.length) return null;
+
+      const N = graph.adj.length;
+      const bestTime = new Float64Array(N);
+      const bestTr = new Int32Array(N);
+      const parent = new Int32Array(N);
+      bestTime.fill(Infinity);
+      bestTr.fill(0x3fffffff);
+      parent.fill(-1);
+
+      const byTransfers = mode === "transfers";
+      const heap = new MinHeap((a, b) => {
+        if (byTransfers) {
+          return a.tr !== b.tr ? a.tr - b.tr : a.time - b.time;
+        }
+        return a.time !== b.time ? a.time - b.time : a.tr - b.tr;
+      });
+
+      for (const sn of startNodes) {
+        bestTime[sn] = 0;
+        bestTr[sn] = 0;
+        heap.push({ node: sn, time: 0, tr: 0 });
+      }
+
+      let targetNode = -1;
+      while (heap.size > 0) {
+        const cur = heap.pop();
+        const u = cur.node;
+        if (cur.time !== bestTime[u] || cur.tr !== bestTr[u]) continue;
+
+        if (graph.nodeStation[u] === toIdx && graph.nodeLine[u] !== -1) {
+          targetNode = u;
+          break;
+        }
+
+        const edges = graph.adj[u];
+        for (let i = 0; i < edges.length; i++) {
+          const e = edges[i];
+          const v = e.to;
+          const nt = cur.time + e.dt;
+          const ntr = cur.tr + e.tr;
+          const better = byTransfers
+            ? (ntr < bestTr[v] || (ntr === bestTr[v] && nt < bestTime[v]))
+            : (nt < bestTime[v] || (nt === bestTime[v] && ntr < bestTr[v]));
+          if (better) {
+            bestTime[v] = nt;
+            bestTr[v] = ntr;
+            parent[v] = u;
+            heap.push({ node: v, time: nt, tr: ntr });
+          }
+        }
+      }
+
+      if (targetNode === -1) return null;
+
+      // Reconstruct ride sequence (skipping HUB nodes)
+      const seq = [];
+      for (let cur = targetNode; cur !== -1; cur = parent[cur]) {
+        if (graph.nodeLine[cur] !== -1) {
+          seq.push({ sIdx: graph.nodeStation[cur], lIdx: graph.nodeLine[cur] });
+        }
+      }
+      seq.reverse();
+
+      const path = [graph.stations[seq[0].sIdx].id];
+      const legs = [];
+      let curLeg = {
+        line: graph.lines[seq[0].lIdx].id,
+        from: graph.stations[seq[0].sIdx].id,
+        to: graph.stations[seq[0].sIdx].id
+      };
+
+      for (let i = 1; i < seq.length; i++) {
+        const prev = seq[i - 1];
+        const curr = seq[i];
+        const currStId = graph.stations[curr.sIdx].id;
+        if (curr.lIdx !== prev.lIdx) {
+          // Transfer occurred at the same station
+          legs.push(curLeg);
+          curLeg = {
+            line: graph.lines[curr.lIdx].id,
+            from: currStId,
+            to: currStId
+          };
+        } else {
+          path.push(currStId);
+          curLeg.to = currStId;
+        }
+      }
+      legs.push(curLeg);
+
+      return {
+        totalTime: Math.round(bestTime[targetNode]),
+        transfers: bestTr[targetNode],
+        path,
+        legs
+      };
+    }
+
+    // ---------------------- Application State ----------------------
+    const state = {
+      graph: null,
+      originId: null,
+      destId: null,
+      mode: "time",
+      currentRoute: null,
+      activeLegendLineId: null,
+      coords: new Map(), // stationId -> { x, y }
+      viewBox: { x: 0, y: 0, w: VIEW_W, h: VIEW_H }
+    };
+
+    // DOM refs
+    const els = {
+      title: document.getElementById("network-title"),
+      stats: document.getElementById("network-stats"),
+      themeBtn: document.getElementById("theme-btn"),
+      originInput: document.getElementById("origin-input"),
+      destInput: document.getElementById("destination-input"),
+      clearOrigin: document.getElementById("clear-origin"),
+      clearDest: document.getElementById("clear-dest"),
+      originSug: document.getElementById("origin-suggestions"),
+      destSug: document.getElementById("destination-suggestions"),
+      swapBtn: document.getElementById("swap-btn"),
+      modeTime: document.getElementById("mode-time"),
+      modeTransfers: document.getElementById("mode-transfers"),
+      summary: document.getElementById("route-summary"),
+      legend: document.getElementById("line-legend"),
+      svg: document.getElementById("metro-svg"),
+      zoomIn: document.getElementById("zoom-in"),
+      zoomOut: document.getElementById("zoom-out"),
+      zoomReset: document.getElementById("zoom-reset")
+    };
+
+    function getTransferCost(st) {
+      return (st.transferTime !== undefined && st.transferTime !== null)
+        ? Number(st.transferTime)
+        : state.graph.defaultTransfer;
+    }
+
+    // ---------------------- Coordinate Normalization & Map Rendering ----------------------
+    function computeNormalizedCoords(stations) {
+      const map = new Map();
+      if (!stations.length) return map;
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      for (const s of stations) {
+        if (s.x < minX) minX = s.x;
+        if (s.x > maxX) maxX = s.x;
+        if (s.y < minY) minY = s.y;
+        if (s.y > maxY) maxY = s.y;
+      }
+      const spanX = Math.max(maxX - minX, 1);
+      const spanY = Math.max(maxY - minY, 1);
+      const availW = VIEW_W - PAD * 2;
+      const availH = VIEW_H - PAD * 2;
+      const scale = Math.min(availW / spanX, availH / spanY);
+      const offsetX = PAD + (availW - spanX * scale) / 2;
+      const offsetY = PAD + (availH - spanY * scale) / 2;
+
+      for (const s of stations) {
+        map.set(s.id, {
+          x: stations.length === 1 ? VIEW_W / 2 : offsetX + (s.x - minX) * scale,
+          y: stations.length === 1 ? VIEW_H / 2 : offsetY + (s.y - minY) * scale
+        });
+      }
+      return map;
+    }
+
+    function svgEl(tag, attrs = {}) {
+      const el = document.createElementNS(SVG_NS, tag);
+      for (const [k, v] of Object.entries(attrs)) {
+        el.setAttribute(k, String(v));
+      }
+      return el;
+    }
+
+    function segKey(a, b) {
+      return a < b ? a + "|" + b : b + "|" + a;
+    }
+
+    // Check segment-AABB intersection / proximity for label placement
+    function distPointToSegSq(px, py, x1, y1, x2, y2) {
+      const dx = x2 - x1, dy = y2 - y1;
+      const lenSq = dx * dx + dy * dy;
+      if (lenSq === 0) return (px - x1) ** 2 + (py - y1) ** 2;
+      let t = ((px - x1) * dx + (py - y1) * dy) / lenSq;
+      t = Math.max(0, Math.min(1, t));
+      const nx = x1 + t * dx, ny = y1 + t * dy;
+      return (px - nx) ** 2 + (py - ny) ** 2;
+    }
+
+    function computeLabelPositions(graph, coords, segments) {
+      const placedBoxes = [];
+      const positions = new Map();
+      const dense = graph.stations.length > 140;
+      if (dense) {
+        for (const s of graph.stations) {
+          const p = coords.get(s.id);
+          positions.set(s.id, { x: p.x + 9, y: p.y + 4, anchor: "start" });
+        }
+        return positions;
+      }
+
+      const stationPts = graph.stations.map(s => coords.get(s.id));
+      const candidates = [
+        { dx: 11, dy: 4, anchor: "start" },
+        { dx: -11, dy: 4, anchor: "end" },
+        { dx: 0, dy: -13, anchor: "middle" },
+        { dx: 0, dy: 18, anchor: "middle" },
+        { dx: 9, dy: -10, anchor: "start" },
+        { dx: 9, dy: 16, anchor: "start" },
+        { dx: -9, dy: -10, anchor: "end" },
+        { dx: -9, dy: 16, anchor: "end" }
+      ];
+
+      // Place interchange labels first so they get cleanest spots
+      const ordered = [...graph.stations].sort((a, b) => {
+        const la = graph.stationLines[graph.stationIdxById.get(a.id)].length;
+        const lb = graph.stationLines[graph.stationIdxById.get(b.id)].length;
+        return lb - la;
+      });
+
+      for (const s of ordered) {
+        const p = coords.get(s.id);
+        const w = Math.max(24, s.name.length * 11.5);
+        const h = 14;
+        let best = null;
+        let bestScore = Infinity;
+
+        for (const cand of candidates) {
+          const lx = p.x + cand.dx;
+          const ly = p.y + cand.dy;
+          let x0 = lx;
+          if (cand.anchor === "middle") x0 = lx - w / 2;
+          else if (cand.anchor === "end") x0 = lx - w;
+          const y0 = ly - 11;
+          const x1 = x0 + w, y1 = y0 + h;
+          const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+
+          let score = 0;
+          // Penalty for clipping edges
+          if (x0 < 10 || x1 > VIEW_W - 10 || y0 < 10 || y1 > VIEW_H - 10) score += 5000;
+
+          // Penalty for overlapping placed labels
+          for (const b of placedBoxes) {
+            const ox = Math.max(0, Math.min(x1, b.x1) - Math.max(x0, b.x0));
+            const oy = Math.max(0, Math.min(y1, b.y1) - Math.max(y0, b.y0));
+            if (ox > 0 && oy > 0) score += 1000 + ox * oy * 12;
+          }
+
+          // Penalty for overlapping other stations
+          for (const sp of stationPts) {
+            if (sp === p) continue;
+            if (sp.x >= x0 - 6 && sp.x <= x1 + 6 && sp.y >= y0 - 6 && sp.y <= y1 + 6) {
+              score += 400;
+            }
+          }
+
+          // Penalty for lying across track segments
+          for (const seg of segments) {
+            if (distPointToSegSq(cx, cy, seg.x1, seg.y1, seg.x2, seg.y2) < 120) {
+              score += 45;
+            }
+          }
+
+          if (score < bestScore) {
+            bestScore = score;
+            best = { x: lx, y: ly, anchor: cand.anchor, box: { x0, y0, x1, y1 } };
+          }
+        }
+        placedBoxes.push(best.box);
+        positions.set(s.id, best);
+      }
+      return positions;
+    }
+
+    function renderLegend() {
+      const { lines } = state.graph;
+      els.legend.innerHTML = "";
+      for (const line of lines) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "legend-item" + (state.activeLegendLineId === line.id ? " active" : "");
+        btn.innerHTML = `<span class="legend-swatch" style="background:${escapeHtml(line.color)}"></span><span>${escapeHtml(line.name)}</span>`;
+        btn.addEventListener("click", () => {
+          state.activeLegendLineId = state.activeLegendLineId === line.id ? null : line.id;
+          renderLegend();
+          renderMap();
+        });
+        els.legend.appendChild(btn);
+      }
+    }
+
+    function renderMap() {
+      const graph = state.graph;
+      const coords = state.coords;
+      const svg = els.svg;
+      svg.innerHTML = "";
+
+      const route = state.currentRoute;
+      const hasRoute = Boolean(route && route.legs && route.legs.length > 0);
+      const focusLineId = !hasRoute ? state.activeLegendLineId : null;
+
+      // Count parallel segments for perpendicular offset
+      const segCounts = new Map();
+      const rawSegs = [];
+      for (const line of graph.lines) {
+        const stIds = line.stations || [];
+        const edgeCount = line.loop ? stIds.length : Math.max(0, stIds.length - 1);
+        for (let i = 0; i < edgeCount; i++) {
+          const u = stIds[i];
+          const v = stIds[(i + 1) % stIds.length];
+          if (!coords.has(u) || !coords.has(v)) continue;
+          const k = segKey(u, v);
+          segCounts.set(k, (segCounts.get(k) || 0) + 1);
+          const p1 = coords.get(u), p2 = coords.get(v);
+          rawSegs.push({ lineId: line.id, u, v, k, x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y });
+        }
+      }
+
+      // Build offset polylines per line
+      const segSeen = new Map();
+      const lineLayer = svgEl("g", { id: "layer-lines" });
+      const highlightLayer = svgEl("g", { id: "layer-route" });
+      const stationLayer = svgEl("g", { id: "layer-stations" });
+      const labelLayer = svgEl("g", { id: "layer-labels" });
+      const pinLayer = svgEl("g", { id: "layer-pins" });
+
+      const strokeW = graph.stations.length > 140 ? 3.5 : 5.5;
+      const offsetStep = strokeW + 1.5;
+
+      // Precompute shifted segments per (lineId, idx)
+      const lineSegMap = new Map(); // `${lineId}:${u}:${v}` -> {x1,y1,x2,y2}
+      for (const line of graph.lines) {
+        const stIds = line.stations || [];
+        const edgeCount = line.loop ? stIds.length : Math.max(0, stIds.length - 1);
+        const pathPts = [];
+        for (let i = 0; i < edgeCount; i++) {
+          const u = stIds[i];
+          const v = stIds[(i + 1) % stIds.length];
+          const p1 = coords.get(u), p2 = coords.get(v);
+          if (!p1 || !p2) continue;
+          const k = segKey(u, v);
+          const total = segCounts.get(k) || 1;
+          const occ = segSeen.get(k) || 0;
+          segSeen.set(k, occ + 1);
+
+          let x1 = p1.x, y1 = p1.y, x2 = p2.x, y2 = p2.y;
+          if (total > 1) {
+            // Canonical normal vector based on canonical u < v so offsets never overlap
+            const ca = u < v ? p1 : p2;
+            const cb = u < v ? p2 : p1;
+            const dx = cb.x - ca.x, dy = cb.y - ca.y;
+            const len = Math.hypot(dx, dy) || 1;
+            const nx = -dy / len, ny = dx / len;
+            const shift = (occ - (total - 1) / 2) * offsetStep;
+            x1 += nx * shift; y1 += ny * shift;
+            x2 += nx * shift; y2 += ny * shift;
+          }
+          lineSegMap.set(`${line.id}:${u}:${v}`, { x1, y1, x2, y2 });
+          lineSegMap.set(`${line.id}:${v}:${u}`, { x1: x2, y1: y2, x2: x1, y2: y1 });
+          pathPts.push({ x1, y1, x2, y2 });
+        }
+
+        if (pathPts.length > 0) {
+          const d = pathPts.map(s => `M ${s.x1.toFixed(1)} ${s.y1.toFixed(1)} L ${s.x2.toFixed(1)} ${s.y2.toFixed(1)}`).join(" ");
+          const dim = hasRoute || (focusLineId && focusLineId !== line.id);
+          const cls = dim ? " dimmed" : "";
+          lineLayer.appendChild(svgEl("path", {
+            d, class: "line-casing" + cls, "stroke-width": strokeW + 3
+          }));
+          lineLayer.appendChild(svgEl("path", {
+            d, class: "line-path" + cls, stroke: line.color, "stroke-width": strokeW
+          }));
+        }
+      }
+
+      // Highlighted route path
+      const routeStationSet = new Set(route ? route.path : []);
+      const transferStationSet = new Set();
+      if (hasRoute) {
+        let cursor = 0;
+        for (let li = 0; li < route.legs.length; li++) {
+          const leg = route.legs[li];
+          const line = graph.lineById.get(leg.line);
+          if (li > 0) transferStationSet.add(leg.from);
+
+          const startPos = cursor;
+          const endPos = route.path.indexOf(leg.to, startPos);
+          cursor = endPos;
+          const pts = [];
+          for (let k = startPos; k < endPos; k++) {
+            const seg = lineSegMap.get(`${leg.line}:${route.path[k]}:${route.path[k + 1]}`);
+            if (seg) pts.push(`M ${seg.x1.toFixed(1)} ${seg.y1.toFixed(1)} L ${seg.x2.toFixed(1)} ${seg.y2.toFixed(1)}`);
+          }
+          const d = pts.join(" ");
+          if (d) {
+            highlightLayer.appendChild(svgEl("path", {
+              d, class: "route-glow", stroke: line.color, "stroke-width": strokeW + 10
+            }));
+            highlightLayer.appendChild(svgEl("path", {
+              d, class: "line-casing", "stroke-width": strokeW + 4.5
+            }));
+            highlightLayer.appendChild(svgEl("path", {
+              d, class: "line-path", stroke: line.color, "stroke-width": strokeW + 2
+            }));
+            highlightLayer.appendChild(svgEl("path", { d, class: "route-flow" }));
+          }
+        }
+      }
+
+      // Label placement
+      const labelPos = computeLabelPositions(graph, coords, rawSegs);
+
+      // Draw stations & labels
+      const baseR = graph.stations.length > 140 ? 4 : 5.5;
+      const xferR = graph.stations.length > 140 ? 5.5 : 8;
+
+      for (let idx = 0; idx < graph.stations.length; idx++) {
+        const st = graph.stations[idx];
+        const p = coords.get(st.id);
+        const linesHere = graph.stationLines[idx];
+        const isInterchange = linesHere.length >= 2;
+
+        let dim = false;
+        if (hasRoute) {
+          dim = !routeStationSet.has(st.id);
+        } else if (focusLineId) {
+          dim = !linesHere.some(l => l.id === focusLineId);
+        }
+
+        const g = svgEl("g", {
+          class: "station-group" + (dim ? " dimmed" : ""),
+          "data-station-id": st.id,
+          tabindex: "0",
+          role: "button",
+          "aria-label": `${st.name} (${st.id})`
+        });
+
+        g.appendChild(svgEl("circle", { cx: p.x, cy: p.y, r: 14, class: "station-hit" }));
+
+        if (isInterchange) {
+          g.appendChild(svgEl("circle", {
+            cx: p.x, cy: p.y, r: xferR + 2,
+            fill: "var(--station-fill)",
+            stroke: "var(--station-ring)",
+            "stroke-width": 2.4
+          }));
+          g.appendChild(svgEl("circle", {
+            cx: p.x, cy: p.y, r: xferR - 2.2,
+            fill: "var(--station-fill)",
+            stroke: transferStationSet.has(st.id) ? "var(--accent)" : "var(--station-ring)",
+            "stroke-width": 1.6
+          }));
+        } else {
+          const lineColor = linesHere.length ? linesHere[0].color : "#64748b";
+          g.appendChild(svgEl("circle", {
+            cx: p.x, cy: p.y, r: baseR,
+            fill: "var(--station-fill)",
+            stroke: lineColor,
+            "stroke-width": 2.5
+          }));
+        }
+
+        g.addEventListener("click", (e) => {
+          e.stopPropagation();
+          handleStationClick(st.id);
+        });
+        g.addEventListener("keydown", (e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            handleStationClick(st.id);
+          }
+        });
+        stationLayer.appendChild(g);
+
+        const lp = labelPos.get(st.id);
+        const label = svgEl("text", {
+          x: lp.x,
+          y: lp.y,
+          "text-anchor": lp.anchor,
+          class: "station-label" + (isInterchange ? " interchange" : "") + (dim ? " dimmed" : "")
+        });
+        label.textContent = st.name;
+        labelLayer.appendChild(label);
+      }
+
+      // Origin & Destination markers
+      function drawPin(stId, text, color) {
+        if (!stId || !coords.has(stId)) return;
+        const p = coords.get(stId);
+        const g = svgEl("g", { style: "pointer-events:none" });
+        g.appendChild(svgEl("circle", {
+          cx: p.x, cy: p.y, r: 12,
+          fill: color, stroke: "#ffffff", "stroke-width": 2.5
+        }));
+        const t = svgEl("text", { x: p.x, y: p.y, class: "pin-label" });
+        t.textContent = text;
+        g.appendChild(t);
+        pinLayer.appendChild(g);
+      }
+
+      drawPin(state.originId, "起", "var(--origin-color)");
+      if (state.destId && state.destId !== state.originId) {
+        drawPin(state.destId, "终", "var(--dest-color)");
+      }
+
+      svg.appendChild(lineLayer);
+      svg.appendChild(highlightLayer);
+      svg.appendChild(stationLayer);
+      svg.appendChild(labelLayer);
+      svg.appendChild(pinLayer);
+      applyViewBox();
+    }
+
+    function applyViewBox() {
+      const vb = state.viewBox;
+      els.svg.setAttribute("viewBox", `${vb.x.toFixed(1)} ${vb.y.toFixed(1)} ${vb.w.toFixed(1)} ${vb.h.toFixed(1)}`);
+    }
+
+    function resetViewBox() {
+      state.viewBox = { x: 0, y: 0, w: VIEW_W, h: VIEW_H };
+      applyViewBox();
+    }
+
+    function zoomBy(factor, cx = VIEW_W / 2, cy = VIEW_H / 2) {
+      const vb = state.viewBox;
+      const nw = Math.max(240, Math.min(VIEW_W * 2, vb.w * factor));
+      const nh = Math.max(168, Math.min(VIEW_H * 2, vb.h * factor));
+      const rx = (cx - vb.x) / vb.w;
+      const ry = (cy - vb.y) / vb.h;
+      vb.x = cx - rx * nw;
+      vb.y = cy - ry * nh;
+      vb.w = nw;
+      vb.h = nh;
+      applyViewBox();
+    }
+
+    // ---------------------- UI State Updates & Route Summary ----------------------
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function updateClearButtons() {
+      els.clearOrigin.classList.toggle("visible", els.originInput.value.length > 0);
+      els.clearDest.classList.toggle("visible", els.destInput.value.length > 0);
+    }
+
+    function setOrigin(id) {
+      state.originId = id;
+      const st = id ? state.graph.stationById.get(id) : null;
+      els.originInput.value = st ? st.name : "";
+      updateClearButtons();
+      recomputeAndRender();
+    }
+
+    function setDest(id) {
+      state.destId = id;
+      const st = id ? state.graph.stationById.get(id) : null;
+      els.destInput.value = st ? st.name : "";
+      updateClearButtons();
+      recomputeAndRender();
+    }
+
+    function handleStationClick(id) {
+      if (!state.originId || (state.originId && state.destId)) {
+        state.originId = id;
+        state.destId = null;
+        const st = state.graph.stationById.get(id);
+        els.originInput.value = st ? st.name : "";
+        els.destInput.value = "";
+        updateClearButtons();
+        recomputeAndRender();
+      } else {
+        setDest(id);
+      }
+    }
+
+    function getLegStations(leg, fullPath, startIdx) {
+      const idxTo = fullPath.indexOf(leg.to, startIdx);
+      return {
+        stations: fullPath.slice(startIdx, idxTo + 1),
+        nextIdx: idxTo
+      };
+    }
+
+    function renderSummary() {
+      const box = els.summary;
+      if (!state.originId || !state.destId) {
+        box.removeAttribute("data-total-time");
+        box.removeAttribute("data-transfers");
+        const originSt = state.originId ? state.graph.stationById.get(state.originId) : null;
+        box.innerHTML = originSt
+          ? `<div class="empty-state"><strong>已选起点：${escapeHtml(originSt.name)}</strong>请继续选择终点站（点击地图或输入站名）。</div>`
+          : `<div class="empty-state"><strong>选择起点与终点</strong>在上方输入站名或直接在右侧线路图上点击任意站点开始规划。</div>`;
+        return;
+      }
+
+      const route = state.currentRoute;
+      if (!route) {
+        box.removeAttribute("data-total-time");
+        box.removeAttribute("data-transfers");
+        box.innerHTML = `<div class="empty-state"><strong>暂无可达路径</strong>所选起点与终点之间当前没有连通的轨道线路。</div>`;
+        return;
+      }
+
+      box.setAttribute("data-total-time", String(route.totalTime));
+      box.setAttribute("data-transfers", String(route.transfers));
+
+      const originName = state.graph.stationById.get(state.originId).name;
+      const destName = state.graph.stationById.get(state.destId).name;
+
+      if (route.legs.length === 0) {
+        box.innerHTML = `
+          <div class="metrics-card">
+            <div class="metric-main"><span class="metric-val">0</span><span class="metric-unit">分钟</span></div>
+            <div class="metric-badges"><span class="pill">同站出发</span><span class="pill">0 次换乘</span></div>
+          </div>
+          <div class="empty-state"><strong>${escapeHtml(originName)}</strong>起点与终点为同一站点，无需乘车。</div>
+        `;
+        return;
+      }
+
+      const transferText = route.transfers === 0 ? "直达（0 次换乘）" : `${route.transfers} 次换乘`;
+      const totalStops = route.path.length - 1;
+
+      let html = `
+        <div class="metrics-card">
+          <div class="metric-main">
+            <span class="metric-val">${route.totalTime}</span>
+            <span class="metric-unit">分钟</span>
+          </div>
+          <div class="metric-badges">
+            <span class="pill">${escapeHtml(transferText)}</span>
+            <span class="pill">共 ${totalStops} 站</span>
+          </div>
+        </div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;">
+          ${escapeHtml(originName)} &rarr; ${escapeHtml(destName)}
+        </div>
+        <div class="legs-list">
+      `;
+
+      let cursor = 0;
+      route.legs.forEach((leg, i) => {
+        const line = state.graph.lineById.get(leg.line);
+        const fromSt = state.graph.stationById.get(leg.from);
+        const toSt = state.graph.stationById.get(leg.to);
+        const sliced = getLegStations(leg, route.path, cursor);
+        cursor = sliced.nextIdx;
+        const stopCount = sliced.stations.length - 1;
+        const stopNames = sliced.stations.map(id => escapeHtml(state.graph.stationById.get(id).name)).join(" &rarr; ");
+
+        if (i > 0) {
+          const xferMins = getTransferCost(fromSt);
+          html += `
+            <div class="transfer-notice">
+              <span class="transfer-icon">&#8644;</span>
+              <span>在 ${escapeHtml(fromSt.name)} 站换乘 ${escapeHtml(line.name)}，约 ${xferMins} 分钟</span>
+            </div>
+          `;
+        }
+
+        html += `
+          <div class="leg-card">
+            <div class="leg-header">
+              <span class="line-badge" style="background:${escapeHtml(line.color)}">${escapeHtml(line.name)}</span>
+              <span class="leg-meta">经过 ${stopCount} 站</span>
+            </div>
+            <div class="leg-route">${escapeHtml(fromSt.name)} &rarr; ${escapeHtml(toSt.name)}</div>
+            <div class="leg-stops">${stopNames}</div>
+          </div>
+        `;
+      });
+
+      html += `</div>`;
+      box.innerHTML = html;
+    }
+
+    function recomputeAndRender() {
+      if (state.originId && state.destId) {
+        state.currentRoute = solveRoute(state.graph, state.originId, state.destId, state.mode);
+      } else {
+        state.currentRoute = null;
+      }
+      renderSummary();
+      renderMap();
+    }
+
+    // ---------------------- Autocomplete Inputs ----------------------
+    function setupAutocomplete(inputEl, sugEl, clearEl, isOrigin) {
+      let matches = [];
+      let activeIdx = -1;
+
+      function close() {
+        sugEl.classList.remove("open");
+        activeIdx = -1;
+      }
+
+      function selectStation(st) {
+        close();
+        if (isOrigin) setOrigin(st.id);
+        else setDest(st.id);
+      }
+
+      function renderList(query) {
+        const q = query.trim().toLowerCase();
+        matches = state.graph.stations.filter(s =>
+          !q || s.name.toLowerCase().includes(q) || s.id.toLowerCase().includes(q)
+        ).slice(0, 20);
+
+        if (!matches.length) {
+          sugEl.innerHTML = `<div class="suggestion-item" style="cursor:default;color:var(--text-muted)">未找到匹配站点</div>`;
+          sugEl.classList.add("open");
+          activeIdx = -1;
+          return;
+        }
+
+        sugEl.innerHTML = "";
+        matches.forEach((st, i) => {
+          const item = document.createElement("div");
+          item.className = "suggestion-item" + (i === activeIdx ? " active" : "");
+          item.setAttribute("role", "option");
+          const sIdx = state.graph.stationIdxById.get(st.id);
+          const dots = state.graph.stationLines[sIdx]
+            .map(l => `<span class="line-dot" style="background:${escapeHtml(l.color)}" title="${escapeHtml(l.name)}"></span>`)
+            .join("");
+          item.innerHTML = `
+            <span class="suggestion-name">${escapeHtml(st.name)} <span class="line-dots">${dots}</span></span>
+            <span class="suggestion-id">${escapeHtml(st.id)}</span>
+          `;
+          item.addEventListener("mousedown", (e) => {
+            e.preventDefault();
+            selectStation(st);
+          });
+          sugEl.appendChild(item);
+        });
+        sugEl.classList.add("open");
+      }
+
+      inputEl.addEventListener("focus", () => {
+        renderList(inputEl.value);
+      });
+
+      inputEl.addEventListener("input", () => {
+        updateClearButtons();
+        // Clear bound selection if user edits away from exact name
+        const trimmed = inputEl.value.trim();
+        const curId = isOrigin ? state.originId : state.destId;
+        if (curId) {
+          const curSt = state.graph.stationById.get(curId);
+          if (!curSt || curSt.name !== trimmed) {
+            if (isOrigin) state.originId = null;
+            else state.destId = null;
+            recomputeAndRender();
+          }
+        }
+        renderList(inputEl.value);
+      });
+
+      inputEl.addEventListener("keydown", (e) => {
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          if (!sugEl.classList.contains("open")) renderList(inputEl.value);
+          if (matches.length) {
+            activeIdx = (activeIdx + 1) % matches.length;
+            renderList(inputEl.value);
+          }
+        } else if (e.key === "ArrowUp") {
+          e.preventDefault();
+          if (matches.length) {
+            activeIdx = activeIdx <= 0 ? matches.length - 1 : activeIdx - 1;
+            renderList(inputEl.value);
+          }
+        } else if (e.key === "Escape") {
+          close();
+        } else if (e.key === "Enter") {
+          e.preventDefault();
+          const q = inputEl.value.trim();
+          const exactName = state.graph.stations.find(s => s.name === q);
+          const exactId = state.graph.stations.find(s => s.id.toLowerCase() === q.toLowerCase());
+          if (activeIdx >= 0 && matches[activeIdx]) {
+            selectStation(matches[activeIdx]);
+          } else if (exactName) {
+            selectStation(exactName);
+          } else if (exactId) {
+            selectStation(exactId);
+          } else if (matches.length === 1) {
+            selectStation(matches[0]);
+          } else if (matches.length > 0 && q.length > 0) {
+            selectStation(matches[0]);
+          }
+        }
+      });
+
+      inputEl.addEventListener("blur", () => {
+        setTimeout(close, 120);
+      });
+
+      clearEl.addEventListener("click", () => {
+        inputEl.value = "";
+        if (isOrigin) setOrigin(null);
+        else setDest(null);
+        inputEl.focus();
+      });
+    }
+
+    // ---------------------- Controls & Pan/Zoom ----------------------
+    function setupControls() {
+      els.modeTime.addEventListener("click", () => {
+        state.mode = "time";
+        els.modeTime.classList.add("active");
+        els.modeTransfers.classList.remove("active");
+        els.modeTime.setAttribute("aria-pressed", "true");
+        els.modeTransfers.setAttribute("aria-pressed", "false");
+        recomputeAndRender();
+      });
+
+      els.modeTransfers.addEventListener("click", () => {
+        state.mode = "transfers";
+        els.modeTransfers.classList.add("active");
+        els.modeTime.classList.remove("active");
+        els.modeTransfers.setAttribute("aria-pressed", "true");
+        els.modeTime.setAttribute("aria-pressed", "false");
+        recomputeAndRender();
+      });
+
+      els.swapBtn.addEventListener("click", () => {
+        const tmpId = state.originId;
+        state.originId = state.destId;
+        state.destId = tmpId;
+        const tmpVal = els.originInput.value;
+        els.originInput.value = els.destInput.value;
+        els.destInput.value = tmpVal;
+        updateClearButtons();
+        recomputeAndRender();
+      });
+
+      els.themeBtn.addEventListener("click", () => {
+        const root = document.documentElement;
+        const cur = root.getAttribute("data-theme");
+        if (cur === "dark") root.setAttribute("data-theme", "light");
+        else if (cur === "light") root.setAttribute("data-theme", "dark");
+        else {
+          const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+          root.setAttribute("data-theme", prefersDark ? "light" : "dark");
+        }
+      });
+
+      els.zoomIn.addEventListener("click", () => zoomBy(0.8));
+      els.zoomOut.addEventListener("click", () => zoomBy(1.25));
+      els.zoomReset.addEventListener("click", resetViewBox);
+
+      // SVG pan & wheel zoom
+      let dragging = false;
+      let startClient = null;
+      let startVB = null;
+
+      els.svg.addEventListener("pointerdown", (e) => {
+        if (e.target.closest(".station-group")) return;
+        dragging = true;
+        startClient = { x: e.clientX, y: e.clientY };
+        startVB = { ...state.viewBox };
+        els.svg.classList.add("panning");
+        els.svg.setPointerCapture(e.pointerId);
+      });
+
+      els.svg.addEventListener("pointermove", (e) => {
+        if (!dragging || !startClient) return;
+        const rect = els.svg.getBoundingClientRect();
+        if (!rect.width || !rect.height) return;
+        const dx = (e.clientX - startClient.x) * (startVB.w / rect.width);
+        const dy = (e.clientY - startClient.y) * (startVB.h / rect.height);
+        state.viewBox.x = startVB.x - dx;
+        state.viewBox.y = startVB.y - dy;
+        applyViewBox();
+      });
+
+      function endDrag(e) {
+        if (!dragging) return;
+        dragging = false;
+        startClient = null;
+        els.svg.classList.remove("panning");
+        if (e && els.svg.hasPointerCapture(e.pointerId)) {
+          els.svg.releasePointerCapture(e.pointerId);
+        }
+      }
+      els.svg.addEventListener("pointerup", endDrag);
+      els.svg.addEventListener("pointercancel", endDrag);
+
+      els.svg.addEventListener("wheel", (e) => {
+        e.preventDefault();
+        const rect = els.svg.getBoundingClientRect();
+        const rx = (e.clientX - rect.left) / (rect.width || 1);
+        const ry = (e.clientY - rect.top) / (rect.height || 1);
+        const cx = state.viewBox.x + rx * state.viewBox.w;
+        const cy = state.viewBox.y + ry * state.viewBox.h;
+        zoomBy(e.deltaY > 0 ? 1.12 : 0.89, cx, cy);
+      }, { passive: false });
+    }
+
+    // ---------------------- Public Bench API ----------------------
+    function loadNetwork(network) {
+      state.graph = buildGraph(network);
+      state.originId = null;
+      state.destId = null;
+      state.currentRoute = null;
+      state.activeLegendLineId = null;
+      state.coords = computeNormalizedCoords(state.graph.stations);
+      resetViewBox();
+
+      els.title.textContent = network.name || "城市地铁线路图";
+      els.stats.textContent = `${state.graph.lines.length} 条线路 · ${state.graph.stations.length} 座车站`;
+      els.originInput.value = "";
+      els.destInput.value = "";
+      updateClearButtons();
+
+      renderLegend();
+      renderSummary();
+      renderMap();
+    }
+
+    window.metroBench = {
+      loadNetwork(network) {
+        loadNetwork(network);
+      },
+      route(fromId, toId, mode = "time") {
+        if (!state.graph) return null;
+        return solveRoute(state.graph, fromId, toId, mode === "transfers" ? "transfers" : "time");
+      }
+    };
+
+    // Initialize
+    setupAutocomplete(els.originInput, els.originSug, els.clearOrigin, true);
+    setupAutocomplete(els.destInput, els.destSug, els.clearDest, false);
+    setupControls();
+    loadNetwork(DEFAULT_NETWORK);
+  })();
+  </script>
+</body>
+</html>
