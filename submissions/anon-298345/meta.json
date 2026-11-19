@@ -8,11 +8,11 @@
     "05"
   ],
   "self_assessment": {
-    "01": null,
-    "02": null,
-    "03": null,
-    "04": null,
-    "05": null
+    "01": "Fixed all 5 bugs and implemented copy_cell with 27 passing unit tests; potential edge cases are unusual formula whitespace or >3-letter shifted columns.",
+    "02": "Computed all metrics from raw CSV/log sources and wrote the postmortem; potential edge case is rounding/tie-breaking conventions if any existed, though none were ambiguous here.",
+    "03": "Solved all 8 problems purely by hand without tools; highest risk of arithmetic slip is in the multi-step rook polynomial recursion for problem 8.",
+    "04": "Derived exact rules for all 10 puzzles and verified 100% pass on every train example; potential risk is unseen test edge cases not exercised by train.",
+    "05": "Implemented single-file metro map UI and state-space Dijkstra routing; JS could not be executed in a headless browser or Node in this environment, so runtime UI behavior is unverified."
   },
   "notes": null
 }
