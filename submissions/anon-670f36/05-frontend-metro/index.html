@@ -1,0 +1,2168 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>城市轨道交通线路规划器</title>
+  <style>
+    :root {
+      --bg: #f1f5f9;
+      --surface: #ffffff;
+      --surface-muted: #f8fafc;
+      --surface-hover: #f1f5f9;
+      --border: #e2e8f0;
+      --border-strong: #cbd5e1;
+      --text: #0f172a;
+      --text-secondary: #475569;
+      --text-muted: #64748b;
+      --accent: #2563eb;
+      --accent-soft: rgba(37, 99, 235, 0.12);
+      --origin: #10b981;
+      --dest: #ef4444;
+      --map-bg: #f8fafc;
+      --map-grid: rgba(148, 163, 184, 0.14);
+      --station-fill: #ffffff;
+      --station-ring: #1e293b;
+      --label-halo: rgba(248, 250, 252, 0.92);
+      --label-text: #1e293b;
+      --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+      --shadow-md: 0 8px 24px rgba(15, 23, 42, 0.08);
+      --radius: 12px;
+      --font: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --bg: #090d16;
+        --surface: #111827;
+        --surface-muted: #1a2234;
+        --surface-hover: #1f2937;
+        --border: #1e293b;
+        --border-strong: #334155;
+        --text: #f1f5f9;
+        --text-secondary: #cbd5e1;
+        --text-muted: #94a3b8;
+        --accent: #3b82f6;
+        --accent-soft: rgba(59, 130, 246, 0.18);
+        --map-bg: #0b1120;
+        --map-grid: rgba(148, 163, 184, 0.08);
+        --station-fill: #0f172a;
+        --station-ring: #e2e8f0;
+        --label-halo: rgba(11, 17, 32, 0.9);
+        --label-text: #e2e8f0;
+        --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+        --shadow-md: 0 10px 28px rgba(0, 0, 0, 0.45);
+      }
+    }
+
+    :root[data-theme="dark"] {
+      --bg: #090d16;
+      --surface: #111827;
+      --surface-muted: #1a2234;
+      --surface-hover: #1f2937;
+      --border: #1e293b;
+      --border-strong: #334155;
+      --text: #f1f5f9;
+      --text-secondary: #cbd5e1;
+      --text-muted: #94a3b8;
+      --accent: #3b82f6;
+      --accent-soft: rgba(59, 130, 246, 0.18);
+      --map-bg: #0b1120;
+      --map-grid: rgba(148, 163, 184, 0.08);
+      --station-fill: #0f172a;
+      --station-ring: #e2e8f0;
+      --label-halo: rgba(11, 17, 32, 0.9);
+      --label-text: #e2e8f0;
+      --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+      --shadow-md: 0 10px 28px rgba(0, 0, 0, 0.45);
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      max-width: 100%;
+      overflow-x: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 14px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: 390px minmax(0, 1fr);
+      height: 100vh;
+      max-width: 100%;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      min-width: 0;
+      height: 100vh;
+      overflow-y: auto;
+      z-index: 10;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 16px 18px 14px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .brand-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .brand-icon {
+      flex-shrink: 0;
+      width: 34px;
+      height: 34px;
+      border-radius: 9px;
+      background: var(--accent);
+      color: #fff;
+      display: grid;
+      place-items: center;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .brand-sub {
+      margin: 1px 0 0;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .theme-btn {
+      flex-shrink: 0;
+      border: 1px solid var(--border);
+      background: var(--surface-muted);
+      color: var(--text-secondary);
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .theme-btn:hover {
+      background: var(--surface-hover);
+      border-color: var(--border-strong);
+    }
+
+    .panel-section {
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    /* Route Inputs */
+    .inputs-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .input-stack {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .field {
+      position: relative;
+    }
+
+    .field-box {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--surface-muted);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 0 10px;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+
+    .field-box:focus-within {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-soft);
+      background: var(--surface);
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .dot.origin { background: var(--origin); }
+    .dot.dest { background: var(--dest); }
+
+    .field-box input {
+      width: 100%;
+      min-width: 0;
+      border: 0;
+      outline: none;
+      background: transparent;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 14px;
+      padding: 9px 0;
+    }
+    .field-box input::placeholder {
+      color: var(--text-muted);
+    }
+
+    .clear-btn {
+      border: 0;
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 4px;
+      line-height: 1;
+      font-size: 15px;
+      border-radius: 4px;
+      display: none;
+    }
+    .clear-btn.visible { display: inline-flex; }
+    .clear-btn:hover { color: var(--text); background: var(--surface-hover); }
+
+    .swap-btn {
+      flex-shrink: 0;
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--surface-muted);
+      color: var(--text-secondary);
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      transition: transform 0.18s ease, background 0.15s, border-color 0.15s;
+    }
+    .swap-btn:hover {
+      background: var(--surface-hover);
+      border-color: var(--border-strong);
+      color: var(--text);
+    }
+    .swap-btn:active {
+      transform: rotate(180deg);
+    }
+
+    /* Autocomplete dropdown */
+    .suggestions {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: calc(100% + 4px);
+      background: var(--surface);
+      border: 1px solid var(--border-strong);
+      border-radius: 10px;
+      box-shadow: var(--shadow-md);
+      max-height: 220px;
+      overflow-y: auto;
+      z-index: 50;
+      display: none;
+    }
+    .suggestions.open { display: block; }
+
+    .suggestion-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 8px 12px;
+      cursor: pointer;
+      font-size: 13px;
+      border-bottom: 1px solid var(--border);
+    }
+    .suggestion-item:last-child { border-bottom: 0; }
+    .suggestion-item:hover,
+    .suggestion-item.active {
+      background: var(--accent-soft);
+    }
+    .suggestion-name {
+      font-weight: 500;
+      color: var(--text);
+    }
+    .suggestion-badges {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+    .mini-badge {
+      font-size: 10px;
+      font-weight: 600;
+      color: #fff;
+      padding: 1px 5px;
+      border-radius: 4px;
+      line-height: 1.4;
+    }
+
+    /* Mode Selector */
+    .mode-group {
+      margin-top: 12px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .mode-option {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      padding: 8px 10px;
+      border-radius: 9px;
+      border: 1px solid var(--border);
+      background: var(--surface-muted);
+      color: var(--text-secondary);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+      user-select: none;
+    }
+    .mode-option:hover {
+      background: var(--surface-hover);
+      border-color: var(--border-strong);
+    }
+    .mode-option.checked,
+    .mode-option:has(input:checked) {
+      background: var(--accent-soft);
+      border-color: var(--accent);
+      color: var(--accent);
+      font-weight: 600;
+    }
+    .mode-option input[type="radio"] {
+      margin: 0;
+      width: 15px;
+      height: 15px;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
+    /* Route Summary */
+    .summary-section {
+      flex: 1;
+      padding: 16px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .empty-state {
+      padding: 20px 14px;
+      border: 1px dashed var(--border-strong);
+      border-radius: var(--radius);
+      color: var(--text-muted);
+      text-align: center;
+      font-size: 13px;
+      background: var(--surface-muted);
+    }
+
+    .alert-error {
+      padding: 14px;
+      border-radius: var(--radius);
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: #dc2626;
+      font-size: 13px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) .alert-error { color: #fca5a5; }
+    }
+    :root[data-theme="dark"] .alert-error { color: #fca5a5; }
+
+    .metrics-card {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      padding: 12px;
+      border-radius: var(--radius);
+      background: var(--surface-muted);
+      border: 1px solid var(--border);
+    }
+    .metric {
+      text-align: center;
+    }
+    .metric-val {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1.25;
+    }
+    .metric-val small {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-muted);
+      margin-left: 2px;
+    }
+    .metric-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .legs-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .leg-card {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      background: var(--surface);
+      border-left: 4px solid var(--leg-color, var(--accent));
+      box-shadow: var(--shadow-sm);
+    }
+
+    .leg-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    .line-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #fff;
+      background: var(--leg-color, var(--accent));
+      padding: 2px 8px;
+      border-radius: 6px;
+    }
+
+    .leg-meta {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .leg-endpoints {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .leg-stations {
+      margin-top: 6px;
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    .transfer-notice {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 12px;
+      border-radius: 8px;
+      background: var(--accent-soft);
+      color: var(--text-secondary);
+      font-size: 12px;
+      font-weight: 500;
+    }
+    .transfer-icon {
+      flex-shrink: 0;
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    /* Legend */
+    .legend-section {
+      padding: 12px 18px 16px;
+      border-top: 1px solid var(--border);
+      background: var(--surface-muted);
+    }
+    .legend-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-muted);
+      margin: 0 0 8px;
+    }
+    .legend-items {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .legend-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 9px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-secondary);
+      font-size: 12px;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s, opacity 0.15s;
+    }
+    .legend-chip:hover {
+      border-color: var(--border-strong);
+    }
+    .legend-chip.active {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+      color: var(--text);
+      font-weight: 600;
+    }
+    .legend-swatch {
+      width: 10px;
+      height: 10px;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+
+    /* Map Canvas */
+    .map-pane {
+      position: relative;
+      background: var(--map-bg);
+      min-width: 0;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .map-grid-bg {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(to right, var(--map-grid) 1px, transparent 1px),
+        linear-gradient(to bottom, var(--map-grid) 1px, transparent 1px);
+      background-size: 32px 32px;
+      pointer-events: none;
+    }
+
+    #metro-map {
+      width: 100%;
+      height: 100%;
+      display: block;
+      touch-action: none;
+      cursor: grab;
+      user-select: none;
+    }
+    #metro-map.dragging { cursor: grabbing; }
+
+    .map-controls {
+      position: absolute;
+      right: 16px;
+      bottom: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      z-index: 5;
+    }
+
+    .map-ctrl-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+      box-shadow: var(--shadow-sm);
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .map-ctrl-btn:hover {
+      background: var(--surface-hover);
+      border-color: var(--border-strong);
+    }
+
+    .map-hint {
+      position: absolute;
+      left: 16px;
+      top: 14px;
+      padding: 6px 11px;
+      border-radius: 999px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      font-size: 12px;
+      box-shadow: var(--shadow-sm);
+      pointer-events: none;
+      max-width: calc(100% - 32px);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* SVG Elements */
+    .line-seg {
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      transition: opacity 0.2s ease, stroke-width 0.2s ease;
+    }
+    .line-seg.dimmed { opacity: 0.18; }
+
+    .route-halo {
+      fill: none;
+      stroke: var(--map-bg);
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      opacity: 0.9;
+    }
+    .route-seg {
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .station-node {
+      cursor: pointer;
+      outline: none;
+    }
+    .station-node.dimmed { opacity: 0.24; }
+    .station-hit { fill: transparent; }
+    .station-dot {
+      transition: transform 0.15s ease;
+      transform-box: fill-box;
+      transform-origin: center;
+    }
+    .station-node:hover .station-dot,
+    .station-node:focus-visible .station-dot {
+      transform: scale(1.22);
+    }
+    .station-label {
+      font-family: var(--font);
+      fill: var(--label-text);
+      paint-order: stroke;
+      stroke: var(--label-halo);
+      stroke-width: 3.5px;
+      stroke-linejoin: round;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+    .station-label.dimmed { opacity: 0.3; }
+    .station-label.active-label {
+      font-weight: 700;
+      opacity: 1;
+    }
+
+    .pin-badge { pointer-events: none; }
+
+    /* Responsive Mobile Layout */
+    @media (max-width: 860px) {
+      .app {
+        display: flex;
+        flex-direction: column;
+        height: auto;
+        min-height: 100vh;
+      }
+      .sidebar {
+        display: contents;
+      }
+      .brand {
+        order: 1;
+        background: var(--surface);
+      }
+      .panel-section {
+        order: 2;
+        background: var(--surface);
+      }
+      .map-pane {
+        order: 3;
+        width: 100%;
+        height: 360px;
+        min-height: 300px;
+        border-bottom: 1px solid var(--border);
+      }
+      .summary-section {
+        order: 4;
+        background: var(--surface);
+      }
+      .legend-section {
+        order: 5;
+      }
+      .map-hint {
+        font-size: 11px;
+        padding: 4px 9px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <header class="brand">
+        <div class="brand-title">
+          <div class="brand-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="4" y="3" width="16" height="15" rx="3" />
+              <path d="M4 11h16" />
+              <path d="M12 3v8" />
+              <path d="M8 18l-2 3" />
+              <path d="M16 18l2 3" />
+              <circle cx="8" cy="14.5" r="1" fill="currentColor" />
+              <circle cx="16" cy="14.5" r="1" fill="currentColor" />
+            </svg>
+          </div>
+          <div style="min-width:0">
+            <h1 id="network-title">滨海市轨道交通(示例)</h1>
+            <p class="brand-sub" id="network-stats"></p>
+          </div>
+        </div>
+        <button type="button" class="theme-btn" id="theme-toggle" title="切换明暗主题">主题: 自动</button>
+      </header>
+
+      <section class="panel-section">
+        <div class="inputs-wrap">
+          <div class="input-stack">
+            <div class="field">
+              <div class="field-box">
+                <span class="dot origin" aria-hidden="true"></span>
+                <input id="origin-input" type="text" placeholder="输入起点站名或点击地图…" autocomplete="off" aria-label="起点站" />
+                <button type="button" class="clear-btn" id="origin-clear" aria-label="清除起点">×</button>
+              </div>
+              <div class="suggestions" id="origin-suggestions" role="listbox"></div>
+            </div>
+
+            <div class="field">
+              <div class="field-box">
+                <span class="dot dest" aria-hidden="true"></span>
+                <input id="destination-input" type="text" placeholder="输入终点站名或点击地图…" autocomplete="off" aria-label="终点站" />
+                <button type="button" class="clear-btn" id="dest-clear" aria-label="清除终点">×</button>
+              </div>
+              <div class="suggestions" id="dest-suggestions" role="listbox"></div>
+            </div>
+          </div>
+
+          <button type="button" class="swap-btn" id="swap-btn" title="交换起终点" aria-label="交换起点和终点">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M7 16V4M7 4L3 8M7 4l4 4" />
+              <path d="M17 8v12m0 0l4-4m-4 4l-4-4" />
+            </svg>
+          </button>
+        </div>
+
+        <div class="mode-group" role="radiogroup" aria-label="规划模式">
+          <label class="mode-option checked" id="mode-time-label">
+            <input type="radio" name="route-mode" id="mode-time" value="time" checked />
+            <span>最短时间</span>
+          </label>
+          <label class="mode-option" id="mode-transfers-label">
+            <input type="radio" name="route-mode" id="mode-transfers" value="transfers" />
+            <span>最少换乘</span>
+          </label>
+        </div>
+      </section>
+
+      <section class="summary-section">
+        <div id="route-summary"></div>
+      </section>
+
+      <section class="legend-section">
+        <h2 class="legend-title">线路图例</h2>
+        <div class="legend-items" id="line-legend"></div>
+      </section>
+    </aside>
+
+    <main class="map-pane">
+      <div class="map-grid-bg"></div>
+      <div class="map-hint" id="map-hint">点击地图站点设置起点与终点，支持滚轮缩放与拖拽平移</div>
+      <svg id="metro-map" xmlns="http://www.w3.org/2000/svg" aria-label="城市地铁线路图"></svg>
+      <div class="map-controls">
+        <button type="button" class="map-ctrl-btn" id="zoom-in" title="放大" aria-label="放大地图">+</button>
+        <button type="button" class="map-ctrl-btn" id="zoom-out" title="缩小" aria-label="缩小地图">−</button>
+        <button type="button" class="map-ctrl-btn" id="zoom-reset" title="重置视图" aria-label="重置视图">⌖</button>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const DEFAULT_NETWORK = {
+      "name": "滨海市轨道交通(示例)",
+      "transferTime": 4,
+      "stations": [
+        { "id": "S01", "name": "西港", "x": 60, "y": 360 },
+        { "id": "S02", "name": "渔人码头", "x": 140, "y": 355 },
+        { "id": "S03", "name": "老城门", "x": 220, "y": 350 },
+        { "id": "S04", "name": "鼓楼", "x": 300, "y": 345 },
+        { "id": "S05", "name": "文庙", "x": 385, "y": 347 },
+        { "id": "S06", "name": "中央广场", "x": 470, "y": 350, "transferTime": 7 },
+        { "id": "S07", "name": "新华路", "x": 560, "y": 350 },
+        { "id": "S08", "name": "体育中心", "x": 640, "y": 350, "transferTime": 2 },
+        { "id": "S09", "name": "东湖", "x": 720, "y": 352 },
+        { "id": "S10", "name": "科技园", "x": 800, "y": 356 },
+        { "id": "S11", "name": "会展中心", "x": 880, "y": 360 },
+        { "id": "S12", "name": "东港", "x": 955, "y": 365 },
+        { "id": "S13", "name": "北站", "x": 470, "y": 40 },
+        { "id": "S14", "name": "植物园", "x": 470, "y": 110 },
+        { "id": "S15", "name": "大学城", "x": 470, "y": 180 },
+        { "id": "S16", "name": "图书馆", "x": 470, "y": 255 },
+        { "id": "S17", "name": "人民医院", "x": 470, "y": 430 },
+        { "id": "S18", "name": "南门", "x": 470, "y": 515 },
+        { "id": "S19", "name": "南站", "x": 470, "y": 625, "transferTime": 6 },
+        { "id": "S20", "name": "青山", "x": 150, "y": 90 },
+        { "id": "S21", "name": "枫林", "x": 230, "y": 150 },
+        { "id": "S22", "name": "太学", "x": 310, "y": 205 },
+        { "id": "S23", "name": "银杏路", "x": 560, "y": 290 },
+        { "id": "S24", "name": "南湖公园", "x": 720, "y": 435 },
+        { "id": "S25", "name": "软件园", "x": 800, "y": 520 },
+        { "id": "S26", "name": "滨江", "x": 865, "y": 600 },
+        { "id": "S30", "name": "云栖", "x": 600, "y": 192 },
+        { "id": "S31", "name": "望江", "x": 690, "y": 255 },
+        { "id": "S32", "name": "观澜", "x": 640, "y": 500 },
+        { "id": "S33", "name": "西苑", "x": 330, "y": 485 },
+        { "id": "S34", "name": "柳岸", "x": 265, "y": 420 },
+        { "id": "S35", "name": "紫金", "x": 390, "y": 172 },
+        { "id": "S40", "name": "机场", "x": 935, "y": 70 },
+        { "id": "S41", "name": "港湾新城", "x": 890, "y": 170 },
+        { "id": "S42", "name": "金融街", "x": 885, "y": 265 },
+        { "id": "S43", "name": "海洋馆", "x": 880, "y": 450 },
+        { "id": "S44", "name": "江心岛", "x": 690, "y": 610 }
+      ],
+      "lines": [
+        {
+          "id": "L1", "name": "1号线", "color": "#d7263d", "loop": false,
+          "stations": ["S01", "S02", "S03", "S04", "S05", "S06", "S07", "S08", "S09", "S10", "S11", "S12"],
+          "times": [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3]
+        },
+        {
+          "id": "L2", "name": "2号线", "color": "#1b6ec2", "loop": false,
+          "stations": ["S13", "S14", "S15", "S16", "S06", "S17", "S18", "S19"],
+          "times": [2, 2, 3, 3, 3, 3, 3]
+        },
+        {
+          "id": "L3", "name": "3号线", "color": "#2a9d4b", "loop": false,
+          "stations": ["S20", "S21", "S22", "S16", "S23", "S08", "S24", "S25", "S26"],
+          "times": [3, 3, 5, 3, 3, 4, 4, 3]
+        },
+        {
+          "id": "L4", "name": "4号线(环线)", "color": "#f08a24", "loop": true,
+          "stations": ["S15", "S30", "S31", "S09", "S24", "S32", "S18", "S33", "S34", "S04", "S22", "S35"],
+          "times": [4, 3, 3, 3, 3, 5, 4, 3, 3, 4, 3, 3]
+        },
+        {
+          "id": "L5", "name": "5号线(机场线)", "color": "#7b3fa0", "loop": false,
+          "stations": ["S40", "S41", "S42", "S11", "S43", "S25", "S44", "S19"],
+          "times": [2, 2, 2, 2, 2, 3, 4]
+        }
+      ]
+    };
+
+    // ---------------- Routing Engine (Min-Heap Dijkstra on (station, line) + HUB) ----------------
+    class MinHeap {
+      constructor(cmp) {
+        this.data = [];
+        this.cmp = cmp;
+      }
+      get size() { return this.data.length; }
+      push(item) {
+        const d = this.data;
+        d.push(item);
+        let i = d.length - 1;
+        while (i > 0) {
+          const p = (i - 1) >> 1;
+          if (this.cmp(d[i], d[p]) >= 0) break;
+          const tmp = d[i]; d[i] = d[p]; d[p] = tmp;
+          i = p;
+        }
+      }
+      pop() {
+        const d = this.data;
+        const top = d[0];
+        const last = d.pop();
+        if (d.length > 0) {
+          d[0] = last;
+          let i = 0;
+          const n = d.length;
+          while (true) {
+            let best = i;
+            const l = (i << 1) + 1;
+            const r = l + 1;
+            if (l < n && this.cmp(d[l], d[best]) < 0) best = l;
+            if (r < n && this.cmp(d[r], d[best]) < 0) best = r;
+            if (best === i) break;
+            const tmp = d[i]; d[i] = d[best]; d[best] = tmp;
+            i = best;
+          }
+        }
+        return top;
+      }
+    }
+
+    function buildGraph(network) {
+      const stationMap = new Map();
+      const stationLines = new Map();
+      const lineMap = new Map();
+      const defaultTransfer = typeof network.transferTime === "number" ? network.transferTime : 0;
+
+      for (const st of network.stations) {
+        stationMap.set(st.id, st);
+        stationLines.set(st.id, []);
+      }
+
+      // Build integer node IDs:
+      // 0 .. numRideNodes-1 : (stationId, lineIdx)
+      // numRideNodes ..     : (stationId, HUB)
+      const nodes = [];
+      const adj = [];
+      const stationRideNodes = new Map();
+      const hubNodeOfStation = new Map();
+
+      function addNode(stationId, lineIdx, isHub) {
+        const id = nodes.length;
+        nodes.push({ stationId, lineIdx, isHub });
+        adj.push([]);
+        return id;
+      }
+
+      for (let li = 0; li < network.lines.length; li++) {
+        const line = network.lines[li];
+        lineMap.set(line.id, { ...line, index: li });
+        const stList = line.stations || [];
+        const times = line.times || [];
+        const nodeIds = new Array(stList.length);
+
+        for (let i = 0; i < stList.length; i++) {
+          const sid = stList[i];
+          if (!stationLines.has(sid)) {
+            stationLines.set(sid, []);
+          }
+          stationLines.get(sid).push(line);
+          const nid = addNode(sid, li, false);
+          nodeIds[i] = nid;
+          if (!stationRideNodes.has(sid)) stationRideNodes.set(sid, []);
+          stationRideNodes.get(sid).push(nid);
+        }
+
+        const edgeCount = line.loop ? stList.length : Math.max(0, stList.length - 1);
+        for (let i = 0; i < edgeCount; i++) {
+          const nextIdx = (i + 1) % stList.length;
+          if (nextIdx === i) continue;
+          const u = nodeIds[i];
+          const v = nodeIds[nextIdx];
+          const w = times[i];
+          adj[u].push({ to: v, time: w, transfer: 0 });
+          adj[v].push({ to: u, time: w, transfer: 0 });
+        }
+      }
+
+      for (const [sid, rNodes] of stationRideNodes.entries()) {
+        if (rNodes.length >= 2) {
+          const st = stationMap.get(sid);
+          const tCost = (st && typeof st.transferTime === "number") ? st.transferTime : defaultTransfer;
+          const hubId = addNode(sid, -1, true);
+          hubNodeOfStation.set(sid, hubId);
+          for (const rn of rNodes) {
+            adj[rn].push({ to: hubId, time: tCost, transfer: 1 });
+            adj[hubId].push({ to: rn, time: 0, transfer: 0 });
+          }
+        }
+      }
+
+      return {
+        network,
+        defaultTransfer,
+        stationMap,
+        stationLines,
+        lineMap,
+        nodes,
+        adj,
+        stationRideNodes
+      };
+    }
+
+    function computeRoute(graph, fromId, toId, mode = "time") {
+      if (!graph.stationMap.has(fromId) || !graph.stationMap.has(toId)) {
+        return null;
+      }
+      if (fromId === toId) {
+        return { totalTime: 0, transfers: 0, path: [fromId], legs: [] };
+      }
+      const startNodes = graph.stationRideNodes.get(fromId);
+      const endNodesList = graph.stationRideNodes.get(toId);
+      if (!startNodes || !startNodes.length || !endNodesList || !endNodesList.length) {
+        return null;
+      }
+
+      const preferTransfers = mode === "transfers";
+      const cmp = preferTransfers
+        ? (a, b) => (a.transfers !== b.transfers ? a.transfers - b.transfers : a.time - b.time)
+        : (a, b) => (a.time !== b.time ? a.time - b.time : a.transfers - b.transfers);
+
+      const n = graph.nodes.length;
+      const bestTime = new Float64Array(n);
+      const bestTrans = new Int32Array(n);
+      const prevNode = new Int32Array(n);
+      bestTime.fill(Infinity);
+      bestTrans.fill(0x3fffffff);
+      prevNode.fill(-1);
+
+      const heap = new MinHeap(cmp);
+      for (const sNode of startNodes) {
+        bestTime[sNode] = 0;
+        bestTrans[sNode] = 0;
+        heap.push({ node: sNode, time: 0, transfers: 0 });
+      }
+
+      const endSet = new Set(endNodesList);
+      let goalNode = -1;
+
+      while (heap.size > 0) {
+        const cur = heap.pop();
+        const u = cur.node;
+        if (cur.time !== bestTime[u] || cur.transfers !== bestTrans[u]) continue;
+        if (endSet.has(u)) {
+          goalNode = u;
+          break;
+        }
+        const edges = graph.adj[u];
+        for (let i = 0; i < edges.length; i++) {
+          const e = edges[i];
+          const v = e.to;
+          const nt = cur.time + e.time;
+          const nk = cur.transfers + e.transfer;
+          const better = preferTransfers
+            ? (nk < bestTrans[v] || (nk === bestTrans[v] && nt < bestTime[v]))
+            : (nt < bestTime[v] || (nt === bestTime[v] && nk < bestTrans[v]));
+          if (better) {
+            bestTime[v] = nt;
+            bestTrans[v] = nk;
+            prevNode[v] = u;
+            heap.push({ node: v, time: nt, transfers: nk });
+          }
+        }
+      }
+
+      if (goalNode === -1) return null;
+
+      // Reconstruct node sequence (excluding HUBs for path/legs)
+      const seq = [];
+      for (let cur = goalNode; cur !== -1; cur = prevNode[cur]) {
+        seq.push(cur);
+      }
+      seq.reverse();
+
+      const rideSeq = seq.filter((nid) => !graph.nodes[nid].isHub);
+      const path = [];
+      const legs = [];
+      let curLeg = null;
+
+      for (let i = 0; i < rideSeq.length; i++) {
+        const info = graph.nodes[rideSeq[i]];
+        const lineObj = graph.network.lines[info.lineIdx];
+        if (path.length === 0 || path[path.length - 1] !== info.stationId) {
+          path.push(info.stationId);
+        }
+        if (i === 0) {
+          curLeg = { line: lineObj.id, from: info.stationId, to: info.stationId };
+        } else {
+          const prevInfo = graph.nodes[rideSeq[i - 1]];
+          if (prevInfo.lineIdx === info.lineIdx) {
+            curLeg.to = info.stationId;
+          } else {
+            legs.push(curLeg);
+            curLeg = { line: lineObj.id, from: info.stationId, to: info.stationId };
+          }
+        }
+      }
+      if (curLeg && curLeg.from !== curLeg.to) {
+        legs.push(curLeg);
+      }
+
+      return {
+        totalTime: bestTime[goalNode],
+        transfers: bestTrans[goalNode],
+        path,
+        legs
+      };
+    }
+
+    // ---------------- Application State ----------------
+    const appState = {
+      graph: null,
+      originId: null,
+      destId: null,
+      mode: "time",
+      lastResult: null,
+      activeLegendLine: null,
+      layout: null,
+      viewBox: { x: 0, y: 0, w: 1000, h: 700 },
+      baseViewBox: { x: 0, y: 0, w: 1000, h: 700 },
+      theme: "auto"
+    };
+
+    const dom = {
+      title: document.getElementById("network-title"),
+      stats: document.getElementById("network-stats"),
+      themeToggle: document.getElementById("theme-toggle"),
+      originInput: document.getElementById("origin-input"),
+      destInput: document.getElementById("destination-input"),
+      originClear: document.getElementById("origin-clear"),
+      destClear: document.getElementById("dest-clear"),
+      originSug: document.getElementById("origin-suggestions"),
+      destSug: document.getElementById("dest-suggestions"),
+      swapBtn: document.getElementById("swap-btn"),
+      modeTime: document.getElementById("mode-time"),
+      modeTransfers: document.getElementById("mode-transfers"),
+      modeTimeLabel: document.getElementById("mode-time-label"),
+      modeTransfersLabel: document.getElementById("mode-transfers-label"),
+      routeSummary: document.getElementById("route-summary"),
+      lineLegend: document.getElementById("line-legend"),
+      svg: document.getElementById("metro-map"),
+      mapHint: document.getElementById("map-hint"),
+      zoomIn: document.getElementById("zoom-in"),
+      zoomOut: document.getElementById("zoom-out"),
+      zoomReset: document.getElementById("zoom-reset")
+    };
+
+    // ---------------- Coordinate Scaling & Label Layout ----------------
+    function computeMapLayout(graph) {
+      const stations = graph.network.stations;
+      const n = stations.length;
+      if (n === 0) {
+        return {
+          pos: new Map(),
+          viewBox: { x: 0, y: 0, w: 800, h: 600 },
+          scale: 1,
+          nodeRadius: 6,
+          strokeW: 5,
+          fontSize: 12,
+          segments: [],
+          labelPlacements: new Map()
+        };
+      }
+
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      for (const s of stations) {
+        if (s.x < minX) minX = s.x;
+        if (s.x > maxX) maxX = s.x;
+        if (s.y < minY) minY = s.y;
+        if (s.y > maxY) maxY = s.y;
+      }
+
+      const rawW = Math.max(1, maxX - minX);
+      const rawH = Math.max(1, maxY - minY);
+      const targetMax = 1000;
+      const scale = n === 1 ? 1 : targetMax / Math.max(rawW, rawH);
+
+      const pos = new Map();
+      for (const s of stations) {
+        pos.set(s.id, {
+          x: (s.x - minX) * scale,
+          y: (s.y - minY) * scale
+        });
+      }
+
+      const scaledW = n === 1 ? 400 : rawW * scale;
+      const scaledH = n === 1 ? 300 : rawH * scale;
+      const pad = Math.max(58, Math.min(90, 75));
+      const viewBox = {
+        x: -pad,
+        y: -pad,
+        w: scaledW + pad * 2,
+        h: scaledH + pad * 2
+      };
+
+      // Adaptive sizes for large vs small networks
+      const densityFactor = n > 120 ? 0.55 : n > 60 ? 0.72 : 1.0;
+      const strokeW = 5.4 * densityFactor;
+      const nodeRadius = 6.0 * densityFactor;
+      const fontSize = Math.max(8, 12.2 * densityFactor);
+
+      // Group undirected edges so parallel lines can be offset side-by-side
+      const edgeGroups = new Map();
+      for (const line of graph.network.lines) {
+        const list = line.stations || [];
+        const cnt = line.loop ? list.length : Math.max(0, list.length - 1);
+        for (let i = 0; i < cnt; i++) {
+          const u = list[i];
+          const v = list[(i + 1) % list.length];
+          if (u === v || !pos.has(u) || !pos.has(v)) continue;
+          const key = u < v ? `${u}\0${v}` : `${v}\0${u}`;
+          if (!edgeGroups.has(key)) edgeGroups.set(key, []);
+          edgeGroups.get(key).push({ line, u, v, time: (line.times && line.times[i]) ?? 0 });
+        }
+      }
+
+      const segments = [];
+      const offsetStep = strokeW * 1.15;
+      const incidentAngles = new Map();
+      for (const s of stations) incidentAngles.set(s.id, []);
+
+      for (const [key, list] of edgeGroups.entries()) {
+        const k = list.length;
+        for (let idx = 0; idx < k; idx++) {
+          const item = list[idx];
+          const p1 = pos.get(item.u);
+          const p2 = pos.get(item.v);
+          const dx = p2.x - p1.x;
+          const dy = p2.y - p1.y;
+          const len = Math.hypot(dx, dy) || 1;
+          // Canonical normal vector based on sorted pair so parallel offsets don't flip
+          const [cu, cv] = item.u < item.v ? [p1, p2] : [p2, p1];
+          const cdx = cv.x - cu.x;
+          const cdy = cv.y - cu.y;
+          const clen = Math.hypot(cdx, cdy) || 1;
+          const nx = -cdy / clen;
+          const ny = cdx / clen;
+          const shift = (idx - (k - 1) / 2) * offsetStep;
+
+          segments.push({
+            line: item.line,
+            u: item.u,
+            v: item.v,
+            x1: p1.x + nx * shift,
+            y1: p1.y + ny * shift,
+            x2: p2.x + nx * shift,
+            y2: p2.y + ny * shift,
+            cx1: p1.x,
+            cy1: p1.y,
+            cx2: p2.x,
+            cy2: p2.y
+          });
+
+          incidentAngles.get(item.u).push(Math.atan2(dy, dx));
+          incidentAngles.get(item.v).push(Math.atan2(-dy, -dx));
+        }
+      }
+
+      // Greedy non-overlapping label placement
+      const placedBoxes = [];
+      const labelPlacements = new Map();
+      const baseGap = nodeRadius + 6;
+      const candidates = [
+        { dx: 0, dy: -(baseGap + 5), anchor: "middle", baseRank: 0 },   // N
+        { dx: baseGap + 2, dy: 4, anchor: "start", baseRank: 1 },       // E
+        { dx: -(baseGap + 2), dy: 4, anchor: "end", baseRank: 1 },      // W
+        { dx: 0, dy: baseGap + fontSize * 0.9, anchor: "middle", baseRank: 1 }, // S
+        { dx: baseGap, dy: -(baseGap + 2), anchor: "start", baseRank: 2 },      // NE
+        { dx: -baseGap, dy: -(baseGap + 2), anchor: "end", baseRank: 2 },       // NW
+        { dx: baseGap, dy: baseGap + fontSize * 0.85, anchor: "start", baseRank: 2 }, // SE
+        { dx: -baseGap, dy: baseGap + fontSize * 0.85, anchor: "end", baseRank: 2 }   // SW
+      ];
+
+      // Place interchange stations first so important hub names get cleanest spots
+      const sortedStations = [...stations].sort((a, b) => {
+        const da = (graph.stationLines.get(a.id) || []).length;
+        const db = (graph.stationLines.get(b.id) || []).length;
+        return db - da;
+      });
+
+      function estTextWidth(name) {
+        let w = 0;
+        for (const ch of name) {
+          w += ch.charCodeAt(0) > 127 ? fontSize * 1.02 : fontSize * 0.62;
+        }
+        return Math.max(fontSize * 1.5, w);
+      }
+
+      function boxOverlap(a, b) {
+        return !(a.x2 <= b.x1 || b.x2 <= a.x1 || a.y2 <= b.y1 || b.y2 <= a.y1);
+      }
+
+      function pointToSegDist(px, py, x1, y1, x2, y2) {
+        const vx = x2 - x1, vy = y2 - y1;
+        const l2 = vx * vx + vy * vy;
+        if (l2 === 0) return Math.hypot(px - x1, py - y1);
+        const t = Math.max(0, Math.min(1, ((px - x1) * vx + (py - y1) * vy) / l2));
+        return Math.hypot(px - (x1 + t * vx), py - (y1 + t * vy));
+      }
+
+      for (const st of sortedStations) {
+        const p = pos.get(st.id);
+        const tw = estTextWidth(st.name);
+        const th = fontSize * 1.15;
+        const angles = incidentAngles.get(st.id) || [];
+
+        let bestCand = candidates[0];
+        let bestScore = Infinity;
+        let bestBox = null;
+
+        for (const cand of candidates) {
+          const lx = p.x + cand.dx;
+          const ly = p.y + cand.dy;
+          let x1;
+          if (cand.anchor === "start") x1 = lx;
+          else if (cand.anchor === "end") x1 = lx - tw;
+          else x1 = lx - tw / 2;
+          const y1 = ly - th * 0.85;
+          const box = { x1, y1, x2: x1 + tw, y2: y1 + th };
+          const cx = (box.x1 + box.x2) / 2;
+          const cy = (box.y1 + box.y2) / 2;
+
+          let score = cand.baseRank * 4;
+
+          // Penalty for clipping outside viewBox
+          if (box.x1 < viewBox.x + 2 || box.x2 > viewBox.x + viewBox.w - 2 ||
+              box.y1 < viewBox.y + 2 || box.y2 > viewBox.y + viewBox.h - 2) {
+            score += 500;
+          }
+
+          // Penalty for overlapping previously placed labels
+          for (const ob of placedBoxes) {
+            if (boxOverlap(box, ob)) {
+              const ox = Math.min(box.x2, ob.x2) - Math.max(box.x1, ob.x1);
+              const oy = Math.min(box.y2, ob.y2) - Math.max(box.y1, ob.y1);
+              score += 120 + ox * oy * 0.5;
+            }
+          }
+
+          // Penalty for overlapping other station dots
+          for (const other of stations) {
+            if (other.id === st.id) continue;
+            const op = pos.get(other.id);
+            if (op.x >= box.x1 - nodeRadius && op.x <= box.x2 + nodeRadius &&
+                op.y >= box.y1 - nodeRadius && op.y <= box.y2 + nodeRadius) {
+              score += 160;
+            }
+          }
+
+          // Penalty for crossing nearby segments (with quick AABB rejection)
+          const segPad = th * 0.75;
+          for (const seg of segments) {
+            if (Math.max(seg.x1, seg.x2) < cx - segPad || Math.min(seg.x1, seg.x2) > cx + segPad ||
+                Math.max(seg.y1, seg.y2) < cy - segPad || Math.min(seg.y1, seg.y2) > cy + segPad) {
+              continue;
+            }
+            const d = pointToSegDist(cx, cy, seg.x1, seg.y1, seg.x2, seg.y2);
+            if (d < segPad) {
+              score += (segPad - d) * 8;
+            }
+          }
+
+          // Angular clearance from incident tracks at this station
+          const candAng = Math.atan2(cand.dy, cand.dx);
+          for (const ang of angles) {
+            let diff = Math.abs(candAng - ang);
+            if (diff > Math.PI) diff = 2 * Math.PI - diff;
+            if (diff < 0.55) score += (0.55 - diff) * 40;
+          }
+
+          if (score < bestScore) {
+            bestScore = score;
+            bestCand = cand;
+            bestBox = box;
+          }
+        }
+
+        if (bestBox) placedBoxes.push(bestBox);
+        labelPlacements.set(st.id, {
+          x: p.x + bestCand.dx,
+          y: p.y + bestCand.dy,
+          anchor: bestCand.anchor
+        });
+      }
+
+      return { pos, viewBox, scale, nodeRadius, strokeW, fontSize, segments, labelPlacements };
+    }
+
+    // ---------------- SVG Rendering ----------------
+    function svgEl(tag, attrs = {}) {
+      const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
+      for (const [k, v] of Object.entries(attrs)) {
+        el.setAttribute(k, String(v));
+      }
+      return el;
+    }
+
+    function applyViewBox() {
+      const vb = appState.viewBox;
+      dom.svg.setAttribute("viewBox", `${vb.x.toFixed(2)} ${vb.y.toFixed(2)} ${vb.w.toFixed(2)} ${vb.h.toFixed(2)}`);
+    }
+
+    function renderMap() {
+      const graph = appState.graph;
+      const layout = appState.layout;
+      const svg = dom.svg;
+      svg.innerHTML = "";
+      applyViewBox();
+
+      const result = appState.lastResult;
+      const hasRoute = Boolean(result && appState.originId && appState.destId);
+      const legendLine = appState.activeLegendLine;
+
+      // Determine active edges and stations for highlighting
+      const activeStationSet = new Set();
+      const activeSegmentMap = new Map(); // "u\0v\0lineId" -> color
+      if (hasRoute) {
+        for (const sid of result.path) activeStationSet.add(sid);
+        // Walk path per leg using graph adjacency / line station sequence
+        let pathIdx = 0;
+        for (const leg of result.legs) {
+          const lineObj = graph.lineMap.get(leg.line);
+          const color = lineObj ? lineObj.color : "#2563eb";
+          while (pathIdx < result.path.length - 1) {
+            const u = result.path[pathIdx];
+            const v = result.path[pathIdx + 1];
+            const key = u < v ? `${u}\0${v}\0${leg.line}` : `${v}\0${u}\0${leg.line}`;
+            activeSegmentMap.set(key, color);
+            pathIdx++;
+            if (v === leg.to) break;
+          }
+        }
+      }
+      if (appState.originId) activeStationSet.add(appState.originId);
+      if (appState.destId) activeStationSet.add(appState.destId);
+
+      // Layer 1: Base track segments
+      const linesLayer = svgEl("g", { class: "layer-lines" });
+      for (const seg of layout.segments) {
+        const segKey = seg.u < seg.v
+          ? `${seg.u}\0${seg.v}\0${seg.line.id}`
+          : `${seg.v}\0${seg.u}\0${seg.line.id}`;
+        const isDimmed = hasRoute
+          ? !activeSegmentMap.has(segKey)
+          : (legendLine ? seg.line.id !== legendLine : false);
+
+        const pathEl = svgEl("path", {
+          d: `M ${seg.x1.toFixed(2)} ${seg.y1.toFixed(2)} L ${seg.x2.toFixed(2)} ${seg.y2.toFixed(2)}`,
+          stroke: seg.line.color,
+          "stroke-width": layout.strokeW,
+          class: isDimmed ? "line-seg dimmed" : "line-seg"
+        });
+        linesLayer.appendChild(pathEl);
+      }
+      svg.appendChild(linesLayer);
+
+      // Layer 2: Highlighted Route overlay (halo + bold colored legs)
+      if (hasRoute && result.legs.length > 0) {
+        const routeLayer = svgEl("g", { class: "layer-route" });
+        for (const seg of layout.segments) {
+          const segKey = seg.u < seg.v
+            ? `${seg.u}\0${seg.v}\0${seg.line.id}`
+            : `${seg.v}\0${seg.u}\0${seg.line.id}`;
+          if (!activeSegmentMap.has(segKey)) continue;
+          const d = `M ${seg.x1.toFixed(2)} ${seg.y1.toFixed(2)} L ${seg.x2.toFixed(2)} ${seg.y2.toFixed(2)}`;
+          routeLayer.appendChild(svgEl("path", {
+            d,
+            class: "route-halo",
+            "stroke-width": layout.strokeW * 1.95
+          }));
+          routeLayer.appendChild(svgEl("path", {
+            d,
+            class: "route-seg",
+            stroke: seg.line.color,
+            "stroke-width": layout.strokeW * 1.28
+          }));
+        }
+        svg.appendChild(routeLayer);
+      }
+
+      // Layer 3: Stations, Labels & Origin/Dest Pin Badges
+      const stationsLayer = svgEl("g", { class: "layer-stations" });
+      const labelsLayer = svgEl("g", { class: "layer-labels" });
+      const pinsLayer = svgEl("g", { class: "layer-pins" });
+
+      for (const st of graph.network.stations) {
+        const p = layout.pos.get(st.id);
+        const lp = layout.labelPlacements.get(st.id);
+        const linesHere = graph.stationLines.get(st.id) || [];
+        const isInterchange = linesHere.length >= 2;
+        const isOrigin = st.id === appState.originId;
+        const isDest = st.id === appState.destId;
+        const inActiveRoute = activeStationSet.has(st.id);
+        const onLegendLine = legendLine ? linesHere.some((l) => l.id === legendLine) : true;
+        const isDimmed = hasRoute ? !inActiveRoute : (legendLine ? !onLegendLine : false);
+
+        const g = svgEl("g", {
+          class: isDimmed ? "station-node dimmed" : "station-node",
+          "data-station-id": st.id,
+          tabindex: "0",
+          role: "button",
+          "aria-label": `${st.name} (${st.id})`
+        });
+
+        // Invisible generous hit target for easy tapping/clicking
+        g.appendChild(svgEl("circle", {
+          cx: p.x.toFixed(2),
+          cy: p.y.toFixed(2),
+          r: Math.max(12, layout.nodeRadius * 2.1),
+          class: "station-hit"
+        }));
+
+        const r = isInterchange ? layout.nodeRadius * 1.32 : layout.nodeRadius;
+        if (isInterchange) {
+          g.appendChild(svgEl("circle", {
+            cx: p.x.toFixed(2),
+            cy: p.y.toFixed(2),
+            r: (r + 2).toFixed(2),
+            fill: "var(--station-ring)",
+            class: "station-dot"
+          }));
+          g.appendChild(svgEl("circle", {
+            cx: p.x.toFixed(2),
+            cy: p.y.toFixed(2),
+            r: r.toFixed(2),
+            fill: "var(--station-fill)",
+            stroke: "var(--map-bg)",
+            "stroke-width": 1.6,
+            class: "station-dot"
+          }));
+          g.appendChild(svgEl("circle", {
+            cx: p.x.toFixed(2),
+            cy: p.y.toFixed(2),
+            r: (r * 0.42).toFixed(2),
+            fill: "var(--station-ring)",
+            class: "station-dot"
+          }));
+        } else {
+          const ringColor = linesHere.length === 1 ? linesHere[0].color : "var(--text-muted)";
+          g.appendChild(svgEl("circle", {
+            cx: p.x.toFixed(2),
+            cy: p.y.toFixed(2),
+            r: r.toFixed(2),
+            fill: "var(--station-fill)",
+            stroke: ringColor,
+            "stroke-width": 2.4,
+            class: "station-dot"
+          }));
+        }
+
+        // Origin / Destination indicator ring + top-layer pin badge placed opposite the label
+        if (isOrigin || isDest) {
+          const badgeColor = isOrigin && isDest ? "#8b5cf6" : (isOrigin ? "#10b981" : "#ef4444");
+          const badgeText = isOrigin && isDest ? "起/终" : (isOrigin ? "起" : "终");
+          g.appendChild(svgEl("circle", {
+            cx: p.x.toFixed(2),
+            cy: p.y.toFixed(2),
+            r: (r + 5.2).toFixed(2),
+            fill: "none",
+            stroke: badgeColor,
+            "stroke-width": 2.6
+          }));
+          const pin = svgEl("g", { class: "pin-badge" });
+          const pw = badgeText.length > 1 ? 30 : 18;
+          const placeBelow = lp.y < p.y - 2;
+          const rectY = placeBelow ? (p.y + r + 8) : (p.y - r - 24);
+          pin.appendChild(svgEl("rect", {
+            x: (p.x - pw / 2).toFixed(2),
+            y: rectY.toFixed(2),
+            width: pw,
+            height: 16,
+            rx: 5,
+            fill: badgeColor
+          }));
+          const txt = svgEl("text", {
+            x: p.x.toFixed(2),
+            y: (rectY + 11.5).toFixed(2),
+            "text-anchor": "middle",
+            "font-size": 10,
+            "font-weight": 700,
+            fill: "#ffffff"
+          });
+          txt.textContent = badgeText;
+          pin.appendChild(txt);
+          pinsLayer.appendChild(pin);
+        }
+
+        const titleEl = svgEl("title");
+        const lineNames = linesHere.map((l) => l.name).join(" / ") || "独立站点";
+        titleEl.textContent = `${st.name} (${lineNames})`;
+        g.appendChild(titleEl);
+
+        stationsLayer.appendChild(g);
+
+        // Station label
+        const labelEl = svgEl("text", {
+          x: lp.x.toFixed(2),
+          y: lp.y.toFixed(2),
+          "text-anchor": lp.anchor,
+          "font-size": (isInterchange ? layout.fontSize * 1.06 : layout.fontSize).toFixed(1),
+          "font-weight": isInterchange || isOrigin || isDest ? "700" : "500",
+          class: isDimmed ? "station-label dimmed" : (inActiveRoute ? "station-label active-label" : "station-label")
+        });
+        labelEl.textContent = st.name;
+        labelsLayer.appendChild(labelEl);
+      }
+
+      svg.appendChild(stationsLayer);
+      svg.appendChild(labelsLayer);
+      svg.appendChild(pinsLayer);
+    }
+
+    // ---------------- UI Rendering & Interactions ----------------
+    function renderLegend() {
+      const container = dom.lineLegend;
+      container.innerHTML = "";
+      for (const line of appState.graph.network.lines) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "legend-chip" + (appState.activeLegendLine === line.id ? " active" : "");
+        const sw = document.createElement("span");
+        sw.className = "legend-swatch";
+        sw.style.background = line.color;
+        const lbl = document.createElement("span");
+        lbl.textContent = line.name;
+        btn.appendChild(sw);
+        btn.appendChild(lbl);
+        btn.addEventListener("click", () => {
+          appState.activeLegendLine = appState.activeLegendLine === line.id ? null : line.id;
+          renderLegend();
+          renderMap();
+        });
+        container.appendChild(btn);
+      }
+    }
+
+    function computeLegInfo(leg) {
+      const graph = appState.graph;
+      const lineObj = graph.lineMap.get(leg.line);
+      const stList = lineObj.stations;
+      const times = lineObj.times;
+      const n = stList.length;
+
+      // Determine direction & stops along leg from leg.from -> leg.to on path
+      const startIdx = stList.indexOf(leg.from);
+      const endIdx = stList.indexOf(leg.to);
+
+      // Extract exact sub-path for this leg from lastResult.path
+      const fullPath = appState.lastResult.path;
+      // Find matching slice in fullPath (handling cases where legs share boundary station)
+      let slice = [];
+      let searchFrom = 0;
+      for (const l of appState.lastResult.legs) {
+        const iStart = fullPath.indexOf(l.from, searchFrom);
+        const iEnd = fullPath.indexOf(l.to, iStart + 1);
+        if (l === leg) {
+          slice = fullPath.slice(iStart, iEnd + 1);
+          break;
+        }
+        searchFrom = iEnd;
+      }
+
+      let legTime = 0;
+      for (let i = 0; i < slice.length - 1; i++) {
+        const a = stList.indexOf(slice[i]);
+        const b = stList.indexOf(slice[i + 1]);
+        if (lineObj.loop && n === 2) {
+          legTime += Math.min(times[0], times[1]);
+        } else if (a + 1 === b) {
+          legTime += times[a];
+        } else if (b + 1 === a) {
+          legTime += times[b];
+        } else if (lineObj.loop && ((a === n - 1 && b === 0) || (b === n - 1 && a === 0))) {
+          legTime += times[n - 1];
+        }
+      }
+
+      return {
+        lineObj,
+        stops: Math.max(1, slice.length - 1),
+        legTime,
+        stationNames: slice.map((id) => graph.stationMap.get(id)?.name || id)
+      };
+    }
+
+    function renderSummary() {
+      const el = dom.routeSummary;
+      el.innerHTML = "";
+      const graph = appState.graph;
+
+      if (!appState.originId || !appState.destId) {
+        el.removeAttribute("data-total-time");
+        el.removeAttribute("data-transfers");
+        appState.lastResult = null;
+        const div = document.createElement("div");
+        div.className = "empty-state";
+        if (appState.originId && !appState.destId) {
+          const stName = graph.stationMap.get(appState.originId)?.name || appState.originId;
+          div.textContent = `已选起点「${stName}」，请点击地图或输入终点站名。`;
+        } else if (!appState.originId && appState.destId) {
+          const stName = graph.stationMap.get(appState.destId)?.name || appState.destId;
+          div.textContent = `已选终点「${stName}」，请点击地图或输入起点站名。`;
+        } else {
+          div.textContent = "在地图上点击站点，或在上方输入站名规划路线。";
+        }
+        el.appendChild(div);
+        return;
+      }
+
+      const res = computeRoute(graph, appState.originId, appState.destId, appState.mode);
+      appState.lastResult = res;
+
+      if (!res) {
+        el.removeAttribute("data-total-time");
+        el.removeAttribute("data-transfers");
+        const alert = document.createElement("div");
+        alert.className = "alert-error";
+        alert.textContent = "抱歉，所选起点与终点之间暂无可达轨道线路。";
+        el.appendChild(alert);
+        return;
+      }
+
+      el.setAttribute("data-total-time", String(res.totalTime));
+      el.setAttribute("data-transfers", String(res.transfers));
+
+      const metrics = document.createElement("div");
+      metrics.className = "metrics-card";
+      const stopTotal = Math.max(0, res.path.length - 1);
+      metrics.innerHTML = `
+        <div class="metric">
+          <div class="metric-val">${res.totalTime}<small>分钟</small></div>
+          <div class="metric-label">预计总耗时</div>
+        </div>
+        <div class="metric">
+          <div class="metric-val">${res.transfers}<small>次</small></div>
+          <div class="metric-label">${res.transfers === 0 ? "直达" : "换乘次数"}</div>
+        </div>
+        <div class="metric">
+          <div class="metric-val">${stopTotal}<small>站</small></div>
+          <div class="metric-label">途经区间</div>
+        </div>
+      `;
+      el.appendChild(metrics);
+
+      if (res.legs.length === 0) {
+        const sameBox = document.createElement("div");
+        sameBox.className = "empty-state";
+        const stName = graph.stationMap.get(appState.originId)?.name || appState.originId;
+        sameBox.textContent = `起点与终点均为「${stName}」，无需乘车。`;
+        el.appendChild(sameBox);
+        return;
+      }
+
+      const legsWrap = document.createElement("div");
+      legsWrap.className = "legs-list";
+
+      for (let i = 0; i < res.legs.length; i++) {
+        const leg = res.legs[i];
+        const info = computeLegInfo(leg);
+        const fromName = graph.stationMap.get(leg.from)?.name || leg.from;
+        const toName = graph.stationMap.get(leg.to)?.name || leg.to;
+
+        const card = document.createElement("div");
+        card.className = "leg-card";
+        card.style.setProperty("--leg-color", info.lineObj.color);
+
+        const header = document.createElement("div");
+        header.className = "leg-header";
+        const pill = document.createElement("span");
+        pill.className = "line-pill";
+        pill.textContent = info.lineObj.name;
+        const meta = document.createElement("span");
+        meta.className = "leg-meta";
+        meta.textContent = `乘 ${info.stops} 站 · ${info.legTime} 分钟`;
+        header.appendChild(pill);
+        header.appendChild(meta);
+
+        const endpoints = document.createElement("div");
+        endpoints.className = "leg-endpoints";
+        endpoints.textContent = `${fromName} → ${toName}`;
+
+        const stListEl = document.createElement("div");
+        stListEl.className = "leg-stations";
+        stListEl.textContent = info.stationNames.join(" · ");
+
+        card.appendChild(header);
+        card.appendChild(endpoints);
+        card.appendChild(stListEl);
+        legsWrap.appendChild(card);
+
+        if (i < res.legs.length - 1) {
+          const nextLeg = res.legs[i + 1];
+          const nextLine = graph.lineMap.get(nextLeg.line);
+          const xferSt = graph.stationMap.get(leg.to);
+          const xferMin = (xferSt && typeof xferSt.transferTime === "number")
+            ? xferSt.transferTime
+            : graph.defaultTransfer;
+
+          const notice = document.createElement("div");
+          notice.className = "transfer-notice";
+          notice.innerHTML = `<span class="transfer-icon">⇄</span><span>在 <strong>${escapeHtml(xferSt ? xferSt.name : leg.to)}</strong> 站换乘 <strong>${escapeHtml(nextLine ? nextLine.name : nextLeg.line)}</strong>，约 ${xferMin} 分钟</span>`;
+          legsWrap.appendChild(notice);
+        }
+      }
+
+      el.appendChild(legsWrap);
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function syncInputs() {
+      const g = appState.graph;
+      dom.originInput.value = appState.originId ? (g.stationMap.get(appState.originId)?.name || appState.originId) : "";
+      dom.destInput.value = appState.destId ? (g.stationMap.get(appState.destId)?.name || appState.destId) : "";
+      dom.originClear.classList.toggle("visible", Boolean(dom.originInput.value));
+      dom.destClear.classList.toggle("visible", Boolean(dom.destInput.value));
+    }
+
+    function updateRouteAndUI() {
+      renderSummary();
+      renderMap();
+    }
+
+    function handleStationSelectOnMap(stationId) {
+      if (appState.originId && appState.destId) {
+        appState.originId = stationId;
+        appState.destId = null;
+      } else if (!appState.originId) {
+        appState.originId = stationId;
+      } else {
+        appState.destId = stationId;
+      }
+      syncInputs();
+      closeAllSuggestions();
+      updateRouteAndUI();
+    }
+
+    // ---------------- Autocomplete Inputs ----------------
+    function closeAllSuggestions() {
+      dom.originSug.classList.remove("open");
+      dom.destSug.classList.remove("open");
+    }
+
+    function findStationMatch(query) {
+      const q = query.trim().toLowerCase();
+      if (!q) return null;
+      const stations = appState.graph.network.stations;
+      // 1. Exact name match
+      const exactName = stations.find((s) => s.name.toLowerCase() === q);
+      if (exactName) return exactName;
+      // 2. Exact id match
+      const exactId = stations.find((s) => s.id.toLowerCase() === q);
+      if (exactId) return exactId;
+      return null;
+    }
+
+    function filterStations(query) {
+      const q = query.trim().toLowerCase();
+      const stations = appState.graph.network.stations;
+      if (!q) return stations.slice(0, 12);
+      const starts = [];
+      const contains = [];
+      for (const s of stations) {
+        const nl = s.name.toLowerCase();
+        const il = s.id.toLowerCase();
+        if (nl.startsWith(q) || il.startsWith(q)) starts.push(s);
+        else if (nl.includes(q) || il.includes(q)) contains.push(s);
+      }
+      return starts.concat(contains).slice(0, 14);
+    }
+
+    function bindStationInput(inputEl, clearEl, sugEl, isOrigin) {
+      let activeIdx = -1;
+      let currentMatches = [];
+
+      function choose(st) {
+        if (isOrigin) appState.originId = st.id;
+        else appState.destId = st.id;
+        inputEl.value = st.name;
+        clearEl.classList.add("visible");
+        sugEl.classList.remove("open");
+        activeIdx = -1;
+        updateRouteAndUI();
+      }
+
+      function renderSug() {
+        currentMatches = filterStations(inputEl.value);
+        activeIdx = -1;
+        sugEl.innerHTML = "";
+        if (currentMatches.length === 0) {
+          sugEl.classList.remove("open");
+          return;
+        }
+        currentMatches.forEach((st, idx) => {
+          const item = document.createElement("div");
+          item.className = "suggestion-item";
+          item.setAttribute("role", "option");
+
+          const nameSpan = document.createElement("span");
+          nameSpan.className = "suggestion-name";
+          nameSpan.textContent = st.name;
+
+          const badges = document.createElement("span");
+          badges.className = "suggestion-badges";
+          const linesHere = appState.graph.stationLines.get(st.id) || [];
+          for (const line of linesHere) {
+            const b = document.createElement("span");
+            b.className = "mini-badge";
+            b.style.background = line.color;
+            b.textContent = line.id;
+            badges.appendChild(b);
+          }
+
+          item.appendChild(nameSpan);
+          item.appendChild(badges);
+          item.addEventListener("mousedown", (e) => {
+            e.preventDefault();
+            choose(st);
+          });
+          sugEl.appendChild(item);
+        });
+        sugEl.classList.add("open");
+      }
+
+      function updateActive() {
+        const items = sugEl.querySelectorAll(".suggestion-item");
+        items.forEach((el, i) => el.classList.toggle("active", i === activeIdx));
+      }
+
+      inputEl.addEventListener("focus", () => {
+        renderSug();
+      });
+
+      inputEl.addEventListener("input", () => {
+        clearEl.classList.toggle("visible", Boolean(inputEl.value));
+        const exact = findStationMatch(inputEl.value);
+        if (isOrigin) appState.originId = exact ? exact.id : null;
+        else appState.destId = exact ? exact.id : null;
+        renderSug();
+        updateRouteAndUI();
+      });
+
+      inputEl.addEventListener("keydown", (e) => {
+        if (e.key === "ArrowDown") {
+          if (!sugEl.classList.contains("open")) renderSug();
+          if (currentMatches.length > 0) {
+            e.preventDefault();
+            activeIdx = (activeIdx + 1) % currentMatches.length;
+            updateActive();
+          }
+        } else if (e.key === "ArrowUp") {
+          if (currentMatches.length > 0) {
+            e.preventDefault();
+            activeIdx = activeIdx <= 0 ? currentMatches.length - 1 : activeIdx - 1;
+            updateActive();
+          }
+        } else if (e.key === "Enter") {
+          e.preventDefault();
+          const exact = findStationMatch(inputEl.value);
+          if (exact) {
+            choose(exact);
+          } else if (activeIdx >= 0 && currentMatches[activeIdx]) {
+            choose(currentMatches[activeIdx]);
+          } else if (currentMatches.length > 0 && inputEl.value.trim()) {
+            choose(currentMatches[0]);
+          }
+        } else if (e.key === "Escape") {
+          sugEl.classList.remove("open");
+        }
+      });
+
+      inputEl.addEventListener("blur", () => {
+        setTimeout(() => sugEl.classList.remove("open"), 140);
+      });
+
+      clearEl.addEventListener("click", () => {
+        inputEl.value = "";
+        clearEl.classList.remove("visible");
+        if (isOrigin) appState.originId = null;
+        else appState.destId = null;
+        sugEl.classList.remove("open");
+        updateRouteAndUI();
+        inputEl.focus();
+      });
+    }
+
+    bindStationInput(dom.originInput, dom.originClear, dom.originSug, true);
+    bindStationInput(dom.destInput, dom.destClear, dom.destSug, false);
+
+    // ---------------- Mode Switch & Swap ----------------
+    function setMode(mode) {
+      appState.mode = mode;
+      dom.modeTime.checked = mode === "time";
+      dom.modeTransfers.checked = mode === "transfers";
+      dom.modeTimeLabel.classList.toggle("checked", mode === "time");
+      dom.modeTransfersLabel.classList.toggle("checked", mode === "transfers");
+      updateRouteAndUI();
+    }
+
+    dom.modeTime.addEventListener("change", () => setMode("time"));
+    dom.modeTransfers.addEventListener("change", () => setMode("transfers"));
+
+    dom.swapBtn.addEventListener("click", () => {
+      const tmpId = appState.originId;
+      appState.originId = appState.destId;
+      appState.destId = tmpId;
+      const tmpVal = dom.originInput.value;
+      dom.originInput.value = dom.destInput.value;
+      dom.destInput.value = tmpVal;
+      dom.originClear.classList.toggle("visible", Boolean(dom.originInput.value));
+      dom.destClear.classList.toggle("visible", Boolean(dom.destInput.value));
+      updateRouteAndUI();
+    });
+
+    // ---------------- Theme Toggle ----------------
+    const THEMES = ["auto", "light", "dark"];
+    const THEME_LABELS = { auto: "主题: 自动", light: "主题: 浅色", dark: "主题: 深色" };
+    dom.themeToggle.addEventListener("click", () => {
+      const idx = (THEMES.indexOf(appState.theme) + 1) % THEMES.length;
+      appState.theme = THEMES[idx];
+      if (appState.theme === "auto") {
+        document.documentElement.removeAttribute("data-theme");
+      } else {
+        document.documentElement.setAttribute("data-theme", appState.theme);
+      }
+      dom.themeToggle.textContent = THEME_LABELS[appState.theme];
+    });
+
+    // ---------------- Map Click, Pan & Zoom ----------------
+    let dragState = null;
+    let suppressNextClick = false;
+
+    dom.svg.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0) return;
+      dragState = {
+        startX: e.clientX,
+        startY: e.clientY,
+        moved: false,
+        vbStart: { ...appState.viewBox }
+      };
+    });
+
+    window.addEventListener("pointermove", (e) => {
+      if (!dragState) return;
+      const dxPx = e.clientX - dragState.startX;
+      const dyPx = e.clientY - dragState.startY;
+      if (!dragState.moved && Math.hypot(dxPx, dyPx) < 5) return;
+      dragState.moved = true;
+      dom.svg.classList.add("dragging");
+
+      const rect = dom.svg.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return;
+      const scale = Math.max(dragState.vbStart.w / rect.width, dragState.vbStart.h / rect.height);
+      appState.viewBox.x = dragState.vbStart.x - dxPx * scale;
+      appState.viewBox.y = dragState.vbStart.y - dyPx * scale;
+      applyViewBox();
+    });
+
+    window.addEventListener("pointerup", () => {
+      if (!dragState) return;
+      if (dragState.moved) {
+        suppressNextClick = true;
+        setTimeout(() => { suppressNextClick = false; }, 0);
+      }
+      dragState = null;
+      dom.svg.classList.remove("dragging");
+    });
+
+    dom.svg.addEventListener("click", (e) => {
+      if (suppressNextClick) {
+        suppressNextClick = false;
+        return;
+      }
+      const stEl = e.target.closest("[data-station-id]");
+      if (stEl) {
+        handleStationSelectOnMap(stEl.getAttribute("data-station-id"));
+      }
+    });
+
+    // Keyboard activation for station nodes
+    dom.svg.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      const stEl = e.target.closest("[data-station-id]");
+      if (stEl) {
+        e.preventDefault();
+        handleStationSelectOnMap(stEl.getAttribute("data-station-id"));
+      }
+    });
+
+    function zoomAt(factor, clientX, clientY) {
+      const vb = appState.viewBox;
+      const base = appState.baseViewBox;
+      const newW = Math.max(base.w * 0.2, Math.min(base.w * 2.5, vb.w * factor));
+      const newH = Math.max(base.h * 0.2, Math.min(base.h * 2.5, vb.h * factor));
+
+      const rect = dom.svg.getBoundingClientRect();
+      const rx = clientX !== undefined && rect.width > 0 ? (clientX - rect.left) / rect.width : 0.5;
+      const ry = clientY !== undefined && rect.height > 0 ? (clientY - rect.top) / rect.height : 0.5;
+
+      vb.x += (vb.w - newW) * rx;
+      vb.y += (vb.h - newH) * ry;
+      vb.w = newW;
+      vb.h = newH;
+      applyViewBox();
+    }
+
+    dom.svg.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      zoomAt(e.deltaY > 0 ? 1.14 : 0.88, e.clientX, e.clientY);
+    }, { passive: false });
+
+    dom.zoomIn.addEventListener("click", () => zoomAt(0.78));
+    dom.zoomOut.addEventListener("click", () => zoomAt(1.28));
+    dom.zoomReset.addEventListener("click", () => {
+      appState.viewBox = { ...appState.baseViewBox };
+      applyViewBox();
+    });
+
+    // ---------------- Network Loading & Public Test API ----------------
+    function loadNetworkInternal(network) {
+      appState.graph = buildGraph(network);
+      appState.originId = null;
+      appState.destId = null;
+      appState.lastResult = null;
+      appState.activeLegendLine = null;
+      appState.layout = computeMapLayout(appState.graph);
+      appState.baseViewBox = { ...appState.layout.viewBox };
+      appState.viewBox = { ...appState.layout.viewBox };
+
+      dom.title.textContent = network.name || "城市轨道交通";
+      dom.stats.textContent = `${network.lines.length} 条线路 · ${network.stations.length} 座车站 · 默认换乘 ${network.transferTime ?? 0} 分钟`;
+      syncInputs();
+      closeAllSuggestions();
+      renderLegend();
+      renderSummary();
+      renderMap();
+    }
+
+    window.metroBench = {
+      loadNetwork(network) {
+        loadNetworkInternal(network);
+      },
+      route(fromId, toId, mode = "time") {
+        return computeRoute(appState.graph, fromId, toId, mode);
+      }
+    };
+
+    // Initialize on load
+    loadNetworkInternal(DEFAULT_NETWORK);
+  </script>
+</body>
+</html>
